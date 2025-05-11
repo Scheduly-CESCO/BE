@@ -1,3 +1,8 @@
+package com.cesco.scheduly.dto;
+
+import lombok.Getter;
+import lombok.Setter;
+
 @Getter @Setter
 public class SignupRequest {
     private String student_id;
