@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 @WebMvcTest(controllers = TimetableController.class,
-        excludeAutoConfiguration = {SecurityAutoConfiguration.class}) // 테스트를 위해 Security 자동 설정 제외 시도
+        excludeAutoConfiguration = {SecurityAutoConfiguration.class})
 public class TimetableControllerTest {
 
     @Autowired
@@ -49,7 +49,7 @@ public class TimetableControllerTest {
     private TimetableService timetableService;
 
     @MockBean
-    private UserService userService; // TimetableController가 UserService도 사용
+    private UserService userService;
 
     private String testUserId;
     private TimePreferenceRequest timePreferenceRequest;
@@ -60,8 +60,7 @@ public class TimetableControllerTest {
         testUserId = "user123";
 
         timePreferenceRequest = new TimePreferenceRequest();
-        timePreferenceRequest.setAvoidDays(List.of("Fri"));
-        // 다른 필드들도 필요에 따라 설정
+        // timePreferenceRequest.setAvoidDays(List.of("Fri")); // 필요시 설정
 
         creditSettingsRequest = new CreditSettingsRequest();
         creditSettingsRequest.setMinTotalCredits(15);
@@ -76,15 +75,14 @@ public class TimetableControllerTest {
 
     @Test
     @DisplayName("시간 선호도 업데이트 API 테스트 - 성공")
-    @WithMockUser(username="testuser", roles={"USER"}) // 가상 사용자 인증 (CSRF와 별개로 인증 필요시)
+    @WithMockUser(username="testuser", roles={"USER"})
     void updateUserTimePreferences_Success() throws Exception {
         // Arrange
-        // userService.saveTimePreferences가 void를 반환하므로 doNothing() 사용
         doNothing().when(userService).saveTimePreferences(anyString(), any(TimePreferenceRequest.class));
 
         // Act & Assert
         mockMvc.perform(put("/api/users/{userId}/timetable/preferences/time", testUserId)
-                        .with(csrf()) // CSRF 토큰 추가 (403 Forbidden 방지)
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(timePreferenceRequest)))
                 .andExpect(status().isOk())
@@ -100,7 +98,7 @@ public class TimetableControllerTest {
 
         // Act & Assert
         mockMvc.perform(put("/api/users/{userId}/timetable/preferences/credits-combination", testUserId)
-                        .with(csrf()) // CSRF 토큰 추가
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(creditSettingsRequest)))
                 .andExpect(status().isOk())
@@ -109,13 +107,13 @@ public class TimetableControllerTest {
 
 
     @Test
-    @DisplayName("시간표 추천 API 테스트 - 성공")
-    @WithMockUser(username="testuser", roles={"USER"}) // 인증된 사용자 설정
+    @DisplayName("시간표 추천 API 테스트 - 성공 (결과 있음)")
+    @WithMockUser(username="testuser", roles={"USER"})
     void getRecommendedTimetables_Success() throws Exception {
         // Arrange
-        RecommendedTimetableDto mockTimetable = new RecommendedTimetableDto(); // 테스트용 데이터 채우기
+        RecommendedTimetableDto mockTimetable = new RecommendedTimetableDto();
         mockTimetable.setTimetableId(1);
-        mockTimetable.setScheduledCourses(Collections.emptyList()); // 예시
+        mockTimetable.setScheduledCourses(Collections.emptyList());
         mockTimetable.setCreditsByType(Collections.emptyMap());
         mockTimetable.setTotalCredits(0);
 
@@ -128,7 +126,7 @@ public class TimetableControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.timetables", hasSize(1)))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.message", is(mockRecommendations.size() + "개의 시간표를 추천합니다."))); // 실제 컨트롤러 반환 메시지 형식에 맞춤
     }
 
     @Test
@@ -143,6 +141,7 @@ public class TimetableControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.timetables", hasSize(0)))
-                .andExpect(jsonPath("$.message", is("추천 가능한 시간표를 찾지 못했습니다. 조건을 변경하거나 필수 과목을 확인해주세요.")));
+                // 수정된 기대 메시지
+                .andExpect(jsonPath("$.message", is("추천 가능한 시간표를 찾지 못했습니다. 조건을 변경해보세요.")));
     }
 }

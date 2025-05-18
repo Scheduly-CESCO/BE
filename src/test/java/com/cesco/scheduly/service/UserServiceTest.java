@@ -1,8 +1,8 @@
 package com.cesco.scheduly.service;
 
 import com.cesco.scheduly.dto.user.UserRegistrationRequest;
-import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserEntity;
+import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.exception.InvalidInputException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
@@ -17,15 +17,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+// import org.mockito.Mockito; // lenient() 사용 시 필요
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq; // eq() Matcher
+// import static org.mockito.Mockito.lenient; // lenient() 사용 시
+import static org.mockito.Mockito.*; // times, never, verify 등
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {

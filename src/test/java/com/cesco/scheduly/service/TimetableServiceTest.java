@@ -60,7 +60,7 @@ class TimetableServiceTest {
         CreditSettingsRequest creditSettings = new CreditSettingsRequest();
         creditSettings.setMinTotalCredits(15);
         creditSettings.setMaxTotalCredits(21);
-        creditSettings.setCourseTypeCombination(List.of("전공", "교양")); // 이 타입들은 DetailedCourseInfo의 generalizedType과 일치해야 함
+        creditSettings.setCourseTypeCombination(List.of("전공", "교양"));
         creditSettings.setCreditRangesPerType(Map.of(
                 "전공", new CreditRangeDto(9, 15),
                 "교양", new CreditRangeDto(3, 6)
@@ -72,14 +72,12 @@ class TimetableServiceTest {
                 .creditSettings(creditSettings)
                 .build();
 
-        // DetailedCourseInfo 생성 시 generalizedType을 CourseDataService의 실제 로직과 유사하게 설정
         DetailedCourseInfo cs101 = new DetailedCourseInfo("CS101", "전공필수과목", "전공", "전공", 3, 3, "1", "교수A", "101", "기초", List.of(new TimeSlotDto("Mon", List.of(1,2,3))), false);
         DetailedCourseInfo ge101 = new DetailedCourseInfo("GE101", "교양필수1", "교양", "교양", 3, 3, "1", "교수B", "201", "", List.of(new TimeSlotDto("Mon", List.of(4,5,6))), false);
         DetailedCourseInfo ge102 = new DetailedCourseInfo("GE102", "교양선택2", "교양", "교양", 2, 2, "전학년", "교수C", "202", "", List.of(new TimeSlotDto("Tue", List.of(1,2,3))), false);
         DetailedCourseInfo major201 = new DetailedCourseInfo("CS201", "전공선택1", "전공", "전공", 3, 3, "2", "교수D", "301", "", List.of(new TimeSlotDto("Wed", List.of(1,2,3))), false);
         DetailedCourseInfo major202 = new DetailedCourseInfo("CS202", "전공선택2", "전공", "전공", 3, 3, "2", "교수E", "302", "", List.of(new TimeSlotDto("Wed", List.of(4,5,6))), false);
         DetailedCourseInfo noTimeCourse = new DetailedCourseInfo("NT101", "시간정보없는교양", "교양", "교양", 1, 1, "1", "교수F", "미정", "", Collections.emptyList(), false);
-        // 특수 과목 예시 (isRestrictedCourse=true, generalizedType도 해당 값으로)
         DetailedCourseInfo militaryCourse = new DetailedCourseInfo("MIL101", "군사학1", "군사학", "군사학", 2, 2, "1", "교수G", "군사교육관", "", List.of(new TimeSlotDto("Thu", List.of(7,8))), true);
 
 
@@ -91,20 +89,25 @@ class TimetableServiceTest {
     void generateRecommendations_WithMandatoryCourse() {
         // Arrange
         when(userService.getUserDetails(anyString())).thenReturn(sampleUser);
-        when(userService.getUserCourseSelection(anyString())).thenReturn(sampleUserSelections); // CS101이 필수
+        when(userService.getUserCourseSelection(anyString())).thenReturn(sampleUserSelections);
         when(userService.getUserPreference(anyString())).thenReturn(sampleUserPreferences);
         when(courseDataService.getDetailedCourses()).thenReturn(new ArrayList<>(sampleAllCourses));
-
-        // TimetableService가 DetailedCourseInfo의 getGeneralizedType()을 사용한다고 가정하면,
-        // courseDataService.mapDepartmentToGeneralizedType()에 대한 스터빙은 여기서 필요 없습니다.
-        // 만약 TimetableService가 이 메소드를 *직접* 호출하는 부분이 있다면, 그 호출에 대해서만 스터빙합니다.
-        // 예를 들어, TimetableService의 calculateCreditsByType에서 generalizedType을 다시 계산하기 위해 호출한다면,
-        // 그 때 필요한 스터빙만 남깁니다. 현재 TimetableService 코드는 DetailedCourseInfo.getGeneralizedType()을 사용합니다.
+        // TimetableService가 DetailedCourseInfo.getGeneralizedType()을 사용하므로,
+        // CourseDataService.mapDepartmentToGeneralizedType()에 대한 스터빙은 여기서 필요 없습니다.
+        // 만약 TimetableService 내부에서 CourseDataService의 mapDepartmentToGeneralizedType을 명시적으로 호출한다면 필요합니다.
+        // (현재 TimetableService 코드는 DetailedCourseInfo에 이미 매핑된 generalizedType을 사용하거나,
+        //  헬퍼 메소드 내부에서 courseDataService.mapDepartmentToGeneralizedType을 호출하도록 되어 있습니다.
+        //  테스트의 일관성을 위해 TimetableService 내에서 generalizedType을 어떻게 얻는지 확인하고,
+        //  만약 courseDataService.mapDepartmentToGeneralizedType을 호출한다면 아래와 같이 모킹합니다.)
+        // when(courseDataService.mapDepartmentToGeneralizedType("전공")).thenReturn("전공");
+        // when(courseDataService.mapDepartmentToGeneralizedType("교양")).thenReturn("교양");
+        // when(courseDataService.mapDepartmentToGeneralizedType("군사학")).thenReturn("군사학"); // 예시
+        // when(courseDataService.mapDepartmentToGeneralizedType(null)).thenReturn("기타");
 
         // Act
         List<RecommendedTimetableDto> recommendations = timetableService.generateRecommendations("user1");
 
-        // Assert (이전과 동일 또는 더 상세하게)
+        // Assert
         assertNotNull(recommendations);
         if (!recommendations.isEmpty()) {
             RecommendedTimetableDto firstRecommendation = recommendations.get(0);
@@ -126,16 +129,12 @@ class TimetableServiceTest {
             for(Map.Entry<String, Integer> entry : firstRecommendation.getCreditsByType().entrySet()){
                 String type = entry.getKey();
                 Integer actualCredits = entry.getValue();
-                if(typeRanges.containsKey(type)){ // 사용자가 설정한 유형에 대해서만 검증
+                if(typeRanges != null && typeRanges.containsKey(type)){ // typeRanges가 null이 아니고, 해당 타입에 대한 설정이 있을 때만 검증
                     assertTrue(actualCredits >= typeRanges.get(type).getMin(), type + " 유형 최소 학점 미달: 실제 " + actualCredits + ", 최소 " + typeRanges.get(type).getMin());
                     assertTrue(actualCredits <= typeRanges.get(type).getMax(), type + " 유형 최대 학점 초과: 실제 " + actualCredits + ", 최대 " + typeRanges.get(type).getMax());
                 }
             }
         } else {
-            // 이 테스트 케이스는 CS101(3학점, 전공)이 필수이고,
-            // CreditSettings에서 전공 최소 9학점, 교양 최소 3학점, 전체 최소 15학점을 요구하므로,
-            // CS101만으로는 조건을 만족하지 못해 추가 과목이 선택되어야 합니다.
-            // 따라서 추천이 나와야 정상입니다. 만약 비어있다면 알고리즘 문제일 수 있습니다.
             fail("기본 시나리오에서 추천 시간표가 생성되지 않았습니다. 알고리즘 또는 데이터 설정을 확인하세요.");
         }
     }
@@ -152,7 +151,8 @@ class TimetableServiceTest {
         when(userService.getUserDetails(anyString())).thenReturn(sampleUser);
         when(userService.getUserCourseSelection(anyString())).thenReturn(sampleUserSelections);
         when(userService.getUserPreference(anyString())).thenReturn(sampleUserPreferences);
-        when(courseDataService.getDetailedCourses()).thenReturn(List.of(cs101Conflict, cs102MandatoryConflict, sampleAllCourses.get(1))); // 테스트에 필요한 최소 강의만 포함
+        // 테스트에 필요한 최소 강의만 포함 (CourseDataService가 이 리스트를 반환하도록 모킹)
+        when(courseDataService.getDetailedCourses()).thenReturn(List.of(cs101Conflict, cs102MandatoryConflict, sampleAllCourses.get(1)));
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
