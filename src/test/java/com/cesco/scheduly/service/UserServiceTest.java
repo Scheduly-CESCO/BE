@@ -22,7 +22,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,7 +49,7 @@ class UserServiceTest {
     private CourseDataService courseDataService; // 현재 userService에서 직접 사용 안 함 (validateCourseCodes가 없다면)
 
     @InjectMocks
-    private UserService userService;
+    private Userservice userService;
 
     private UserRegistrationRequest registrationRequest;
     private UserEntity sampleUser;
@@ -65,7 +64,7 @@ class UserServiceTest {
         registrationRequest.setMajor("컴퓨터공학부");
 
         sampleUser = UserEntity.builder()
-                .userId(sampleUserId)
+                .Id(Long.valueOf(sampleUserId))
                 .username("testuser")
                 .passwordHash("hashedPassword")
                 .grade("1")

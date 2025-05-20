@@ -12,10 +12,10 @@ import java.util.stream.Collectors;
 @Service
 public class TimetableService {
 
-    private final UserService userService;
+    private final Userservice userService;
     private final CourseDataService courseDataService;
 
-    public TimetableService(UserService userService, CourseDataService courseDataService) {
+    public TimetableService(Userservice userService, CourseDataService courseDataService) {
         this.userService = userService;
         this.courseDataService = courseDataService;
     }

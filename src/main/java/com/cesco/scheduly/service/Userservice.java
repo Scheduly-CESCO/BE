@@ -1,8 +1,10 @@
 package com.cesco.scheduly.service;
 
+import com.cesco.scheduly.dto.SignupRequest;
 import com.cesco.scheduly.dto.user.UserRegistrationRequest;
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
+import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
@@ -16,12 +18,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 @Service
-public class UserService {
+public class Userservice {
 
     private final UserRepository userRepository;
     private final UserCourseSelectionRepository userCourseSelectionRepository;
@@ -31,7 +34,7 @@ public class UserService {
 
 
     @Autowired // 생성자 주입 명시
-    public UserService(UserRepository userRepository,
+    public Userservice(UserRepository userRepository,
                        UserCourseSelectionRepository userCourseSelectionRepository,
                        UserPreferenceRepository userPreferenceRepository,
                        PasswordEncoder passwordEncoder,
@@ -44,6 +47,31 @@ public class UserService {
     }
 
     @Transactional
+    public UserEntity signup(SignupRequest dto) {
+        if (userRepository.existsByStudentId(dto.getStudentId())) {
+            throw new InvalidInputException("이미 등록된 학번입니다.");
+        }
+
+        UserEntity user = new UserEntity();
+        user.setStudentId(dto.getStudentId());
+        user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+        user.setName(dto.getName());
+        user.setCreatedAt(LocalDateTime.now());
+
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public UserEntity authenticate(String studentId, String password) {
+        UserEntity user = userRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 학번입니다."));
+
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            throw new RuntimeException("비밀번호가 일치하지 않습니다.");
+        }
+        return user;
+    }
+
     public UserEntity registerUser(UserRegistrationRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new InvalidInputException("이미 사용 중인 사용자명입니다: " + request.getUsername());
@@ -187,7 +215,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserEntity getUserDetails(String userId){
+    public UserEntity getUserDetails(String userId) {
         return findUserById(userId);
     }
 }

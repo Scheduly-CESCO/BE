@@ -12,13 +12,13 @@ public class JwtTokenProvider {
     @Value("${jwt.secret}")
     private String secretKey;
 
-    private final long validityInMs = 3600_000; // 1 hour
-
     public String createToken(String studentId, Long userId) {
         Claims claims = Jwts.claims().setSubject(studentId);
         claims.put("user_id", userId);
 
         Date now = new Date();
+        // 1 hour
+        long validityInMs = 3600000;
         Date expiry = new Date(now.getTime() + validityInMs);
 
         return Jwts.builder()

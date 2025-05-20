@@ -1,13 +1,24 @@
+package com.cesco.scheduly.service;
+
+import com.cesco.scheduly.repository.LectureRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 public class LectureDataService {
 
-    @Autowired
-    private LectureRepository lectureRepository;
+    private final LectureRepository lectureRepository;
+
+    public LectureDataService(LectureRepository lectureRepository) {
+        this.lectureRepository = lectureRepository;
+    }
 
     public List<String> findLecturesByPrefix(List<String> prefixes) {
-        List<String> allLectureIds = lectureRepository.findAllLectureIds(); // ["CS101-01", ...]
+        List<String> allLectureIds = lectureRepository.findAllLectureIds();
         return allLectureIds.stream()
-                .filter(id -> prefixes.stream().anyMatch(prefix -> id.startsWith(prefix)))
+                .filter(id -> prefixes.stream().anyMatch(id::startsWith))
                 .collect(Collectors.toList());
     }
 }

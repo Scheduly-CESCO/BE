@@ -6,7 +6,7 @@ import com.cesco.scheduly.dto.timetable.RecommendedTimetableDto;
 import com.cesco.scheduly.dto.timetable.RecommendedTimetableResponse;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
 import com.cesco.scheduly.service.TimetableService;
-import com.cesco.scheduly.service.UserService;
+import com.cesco.scheduly.service.Userservice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,9 +19,9 @@ import java.util.List;
 public class TimetableController {
 
     private final TimetableService timetableService;
-    private final UserService userService;
+    private final Userservice userService;
 
-    public TimetableController(TimetableService timetableService, UserService userService) {
+    public TimetableController(TimetableService timetableService, Userservice userService) {
         this.timetableService = timetableService;
         this.userService = userService;
     }

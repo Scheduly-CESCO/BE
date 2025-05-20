@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class TimetableServiceTest {
 
     @Mock
-    private UserService userService;
+    private Userservice userService;
 
     @Mock
     private CourseDataService courseDataService; // TimetableService가 CourseDataService를 사용함
@@ -42,7 +42,7 @@ class TimetableServiceTest {
 
     @BeforeEach
     void setUp() {
-        sampleUser = UserEntity.builder().userId("user1").grade("2").major("컴퓨터공학부").build();
+        sampleUser = UserEntity.builder().Id(Long.valueOf("user1")).grade("2").major("컴퓨터공학부").build();
 
         List<String> mandatoryCodes = List.of("CS101");
         List<String> takenCodes = List.of("OLD101");

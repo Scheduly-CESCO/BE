@@ -10,7 +10,7 @@ import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.exception.InvalidInputException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.service.CourseDataService;
-import com.cesco.scheduly.service.UserService;
+import com.cesco.scheduly.service.Userservice;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,11 +26,11 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class UserController {
 
-    private final UserService userService;
+    private final Userservice userService;
     private final CourseDataService courseDataService; // getTakenCourses에서 사용
 
     @Autowired
-    public UserController(UserService userService, CourseDataService courseDataService) {
+    public UserController(Userservice userService, CourseDataService courseDataService) {
         this.userService = userService;
         this.courseDataService = courseDataService;
     }
@@ -41,7 +41,7 @@ public class UserController {
         try {
             UserEntity newUser = userService.registerUser(registrationRequest);
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new UserResponse(newUser.getUserId(), "사용자 등록에 성공했습니다."));
+                    .body(new UserResponse(newUser.getId(), "사용자 등록에 성공했습니다."));
         } catch (InvalidInputException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiResponse(e.getMessage()));
         } catch (RuntimeException e) {
