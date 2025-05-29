@@ -1,22 +1,47 @@
 package com.cesco.scheduly.controller;
 
-import com.cesco.scheduly.dto.PreferencesRequest;
+import com.cesco.scheduly.service.Userservice;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import lombok.RequiredArgsConstructor;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/preferences")
+@RequiredArgsConstructor
 public class PreferencesController {
 
-  @PostMapping
-  public ResponseEntity<?> savePreferences(@RequestBody PreferencesRequest dto) {
-    // TODO:
-    System.out.println("수강한 과목: " + dto.getCompleted_lectures());
-    System.out.println("필수 과목: " + dto.getRequired_lectures());
-    System.out.println("재수강 과목: " + dto.getRetake_lectures());
+  private final Userservice userService;
 
-    return ResponseEntity.ok(Map.of("status", "saved"));
+  // 기수강 과목
+  @PostMapping
+  public ResponseEntity<?> savePreferencesLectures(
+          @RequestParam String userId,
+          @RequestBody List<String> completedLectures
+  ) {
+    userService.updateTakenCourses(userId, completedLectures);
+    return ResponseEntity.ok(Map.of("status", "completed_saved"));
+  }
+
+  // 필수 과목
+  @PostMapping("/required")
+  public ResponseEntity<?> saveRequiredPreferences(
+          @RequestParam String userId,
+          @RequestBody List<String> requiredLectures
+  ) {
+    userService.updateMandatoryCourses(userId, requiredLectures);
+    return ResponseEntity.ok(Map.of("status", "required_saved"));
+  }
+
+  // 재수강 과목
+  @PostMapping("/retake")
+  public ResponseEntity<?> saveRetakePreferences(
+          @RequestParam String userId,
+          @RequestBody List<String> retakeLectures
+  ) {
+    userService.updateTakenCourses(userId, retakeLectures);
+    return ResponseEntity.ok(Map.of("status", "retake_saved"));
   }
 }
