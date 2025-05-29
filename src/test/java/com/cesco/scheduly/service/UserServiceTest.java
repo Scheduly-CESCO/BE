@@ -1,8 +1,8 @@
 package com.cesco.scheduly.service;
 
 import com.cesco.scheduly.dto.user.UserRegistrationRequest;
-import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
+import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.exception.InvalidInputException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
@@ -17,7 +17,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
-// import org.mockito.Mockito; // lenient() 사용 시 필요
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,9 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq; // eq() Matcher
-// import static org.mockito.Mockito.lenient; // lenient() 사용 시
-import static org.mockito.Mockito.*; // times, never, verify 등
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -46,14 +43,17 @@ class UserServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private CourseDataService courseDataService; // 현재 userService에서 직접 사용 안 함 (validateCourseCodes가 없다면)
+    private CourseDataService courseDataService; // 현재 userService에서 직접 사용 안 함
 
     @InjectMocks
     private Userservice userService;
 
     private UserRegistrationRequest registrationRequest;
     private UserEntity sampleUser;
-    private String sampleUserId = "test-uuid";
+    private String sampleUserId = "user-uuid-123"; // 실제 UUID 형식으로 변경해도 무방
+    // 실제 학수번호 형식으로 변경된 예시
+    private String courseCode1 = "M01207101"; // 예시: 머신러닝
+    private String courseCode2 = "Y11113E11"; // 예시: 신입생세미나
 
     @BeforeEach
     void setUp() {
@@ -116,7 +116,7 @@ class UserServiceTest {
     @DisplayName("수강 이력 업데이트 테스트 - 성공")
     void updateTakenCourses_Success() {
         // Arrange
-        List<String> courseCodes = List.of("CS101", "MA202");
+        List<String> courseCodesToUpdate = List.of(courseCode1, courseCode2);
         UserCourseSelectionEntity selectionEntity = UserCourseSelectionEntity.builder()
                 .user(sampleUser)
                 .takenCourses(new ArrayList<>())
@@ -124,19 +124,14 @@ class UserServiceTest {
                 .retakeCourses(new ArrayList<>())
                 .build();
 
-        // UserService.updateTakenCourses -> getUserCourseSelection -> userCourseSelectionRepository.findByUser_UserId 호출
         when(userCourseSelectionRepository.findByUser_UserId(sampleUserId)).thenReturn(Optional.of(selectionEntity));
-        // userCourseSelectionRepository.save는 verify로 확인하거나, 필요시 반환값 스터빙
-        // when(userCourseSelectionRepository.save(any(UserCourseSelectionEntity.class))).thenReturn(selectionEntity); // 이 스터빙은 현재 로직에서 사용되지 않을 수 있음
 
         // Act
-        userService.updateTakenCourses(sampleUserId, courseCodes);
+        userService.updateTakenCourses(sampleUserId, courseCodesToUpdate);
 
         // Assert
-        assertEquals(courseCodes, selectionEntity.getTakenCourses());
+        assertEquals(courseCodesToUpdate, selectionEntity.getTakenCourses());
         verify(userCourseSelectionRepository, times(1)).save(selectionEntity);
-        // userRepository.findById는 getUserCourseSelection 내부 로직에 따라 호출될 수도, 안될 수도 있음.
-        // 현재 UserService.getUserCourseSelection는 userRepository.findById를 직접 호출하지 않으므로 관련 스터빙 불필요.
     }
 
     @Test
@@ -144,25 +139,38 @@ class UserServiceTest {
     void updateTakenCourses_Fail_UserNotFound() {
         // Arrange
         String nonExistentUserId = "nonExistentUser";
-        List<String> courseCodes = List.of("CS101");
+        List<String> courseCodesToUpdate = List.of(courseCode1);
         String expectedErrorMessage = "사용자 ID " + nonExistentUserId + "에 대한 과목 선택 정보를 찾을 수 없습니다.";
 
-        // UserService.updateTakenCourses -> getUserCourseSelection -> userCourseSelectionRepository.findByUser_UserId 호출 시 Optional.empty() 반환
         when(userCourseSelectionRepository.findByUser_UserId(nonExistentUserId)).thenReturn(Optional.empty());
-        // UserService의 getUserCourseSelection이 ResourceNotFoundException을 던지도록 되어 있음
 
         // Act & Assert
         ResourceNotFoundException exception = assertThrows(ResourceNotFoundException.class, () -> {
-            userService.updateTakenCourses(nonExistentUserId, courseCodes);
+            userService.updateTakenCourses(nonExistentUserId, courseCodesToUpdate);
         });
-        assertEquals(expectedErrorMessage, exception.getMessage()); // 정확한 예외 메시지 확인
+        assertEquals(expectedErrorMessage, exception.getMessage());
 
         verify(userCourseSelectionRepository, never()).save(any(UserCourseSelectionEntity.class));
-        // userRepository.findById 호출 여부는 UserService.getUserCourseSelection 내부 로직에 따라 달라짐
-        // (현재는 findByUser_UserId만으로 예외 발생 가능)
     }
 
-    // TODO: getTakenCourses, updateMandatoryCourses, updateRetakeCourses,
-    //       선호도 저장/조회(saveTimePreferences, getTimePreferences 등) 관련 메소드 테스트 추가
-    //       각 테스트는 해당 메소드가 실제로 호출하는 repository 메소드에 대해서만 스터빙합니다.
+    // getTakenCourses, updateMandatoryCourses, updateRetakeCourses 등 다른 메소드들도
+    // courseCode1, courseCode2 와 같은 실제 형식의 학수번호를 사용하도록 수정합니다.
+    // 예시: getTakenCourses
+    @Test
+    @DisplayName("수강 이력 조회 테스트")
+    void getTakenCourses_Success() {
+        // Arrange
+        List<String> expectedTakenCourses = List.of(courseCode1, courseCode2);
+        UserCourseSelectionEntity selectionEntity = UserCourseSelectionEntity.builder()
+                .user(sampleUser)
+                .takenCourses(new ArrayList<>(expectedTakenCourses))
+                .build();
+        when(userCourseSelectionRepository.findByUser_UserId(sampleUserId)).thenReturn(Optional.of(selectionEntity));
+
+        // Act
+        List<String> actualTakenCourses = userService.getTakenCourses(sampleUserId);
+
+        // Assert
+        assertEquals(expectedTakenCourses, actualTakenCourses);
+    }
 }

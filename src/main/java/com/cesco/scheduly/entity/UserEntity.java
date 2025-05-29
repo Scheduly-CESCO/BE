@@ -36,7 +36,7 @@ public class UserEntity {
     @Column
     private String grade;
 
-    @Column
+    @Column(name = "major")
     private String major;
 
     @Column(name = "double_major")

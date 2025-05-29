@@ -25,7 +25,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// @WebMvcTest에 SecurityAutoConfiguration을 제외하도록 설정
 @WebMvcTest(controllers = CourseController.class,
         excludeAutoConfiguration = {SecurityAutoConfiguration.class})
 public class CourseControllerTest {
@@ -37,32 +36,35 @@ public class CourseControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private CourseDataService courseDataService; // CourseController의 의존성이므로 모킹
+    private CourseDataService courseDataService;
+
+    // 실제 학수번호 형식 예시
+    private String courseCodeSample1 = "M01207101";
+    private String courseCodeSample2 = "G01001001";
 
     @Test
     @DisplayName("강의 검색 API 테스트 - 성공 (결과 있음)")
     void searchCourses_WhenCoursesFound_ShouldReturnCourseList() throws Exception {
         // Arrange
-        CourseInfo course1 = new CourseInfo("CS101", "프로그래밍 기초", "컴퓨터공학부", 3, "1");
-        CourseInfo course2 = new CourseInfo("MA202", "미적분학1", "수학과", 3, "1");
+        CourseInfo course1 = new CourseInfo(courseCodeSample1, "머신러닝", "전공", 3, "2");
+        CourseInfo course2 = new CourseInfo(courseCodeSample2, "교양1", "교양", 3, "1");
         List<CourseInfo> mockResults = List.of(course1, course2);
 
-        // CourseDataService의 searchCourses 메소드가 어떤 인자로 호출되든 mockResults를 반환하도록 설정
         when(courseDataService.searchCourses(anyString(), anyString(), anyString())).thenReturn(mockResults);
 
         // Act & Assert
         mockMvc.perform(get("/api/courses/search")
-                        .param("q", "프로그래밍")
-                        .param("department", "컴퓨터공학부")
-                        .param("grade", "1")
+                        .param("q", "머신")
+                        .param("department", "전공")
+                        .param("grade", "2")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk()) // HTTP 상태 코드 200 (OK) 기대
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courses", hasSize(2)))
-                .andExpect(jsonPath("$.courses[0].courseCode", is("CS101")))
-                .andExpect(jsonPath("$.courses[1].courseName", is("미적분학1"))); // 필드명 수정
+                .andExpect(jsonPath("$.courses[0].courseCode", is(courseCodeSample1)))
+                .andExpect(jsonPath("$.courses[0].courseName", is("머신러닝")))
+                .andExpect(jsonPath("$.courses[1].courseCode", is(courseCodeSample2)));
 
-        // courseDataService의 searchCourses 메소드가 올바른 인자로 호출되었는지 확인
-        verify(courseDataService).searchCourses("프로그래밍", "컴퓨터공학부", "1");
+        verify(courseDataService).searchCourses("머신", "전공", "2");
     }
 
     @Test
@@ -78,14 +80,14 @@ public class CourseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courses", hasSize(0)));
 
-        verify(courseDataService).searchCourses("매우특이한검색어", null, null); // department, grade는 null로 전달될 것
+        verify(courseDataService).searchCourses("매우특이한검색어", null, null);
     }
 
     @Test
     @DisplayName("강의 검색 API 테스트 - 파라미터 없이 호출")
     void searchCourses_WhenNoParameters_ShouldReturnAppropriateResults() throws Exception {
         // Arrange
-        CourseInfo course1 = new CourseInfo("CS101", "프로그래밍 기초", "컴퓨터공학부", 3, "1");
+        CourseInfo course1 = new CourseInfo(courseCodeSample1, "머신러닝", "전공", 3, "2");
         List<CourseInfo> allCoursesMock = List.of(course1);
 
         when(courseDataService.searchCourses(isNull(), isNull(), isNull())).thenReturn(allCoursesMock);
@@ -95,7 +97,7 @@ public class CourseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courses", hasSize(1)))
-                .andExpect(jsonPath("$.courses[0].courseCode", is("CS101")));
+                .andExpect(jsonPath("$.courses[0].courseCode", is(courseCodeSample1)));
 
         verify(courseDataService).searchCourses(isNull(), isNull(), isNull());
     }
