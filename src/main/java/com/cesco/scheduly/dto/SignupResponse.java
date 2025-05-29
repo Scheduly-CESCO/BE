@@ -17,7 +17,7 @@ public class SignupResponse {
     private LocalDateTime createdAt;
 
     public SignupResponse(UserEntity user) {
-        this.id = user.getId();
+        this.id = user.getUserId();
         this.studentId = user.getStudentId();
         this.name = user.getName();
         this.createdAt = user.getCreatedAt();
