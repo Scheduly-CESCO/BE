@@ -18,9 +18,10 @@ public class TimetableService {
     private static final Logger logger = LoggerFactory.getLogger(TimetableService.class);
 
     private final UserService userService;
+
     private final CourseDataService courseDataService;
 
-    public TimetableService(UserService userService, CourseDataService courseDataService) {
+    public TimetableService(Userservice userService, CourseDataService courseDataService) {
         this.userService = userService;
         this.courseDataService = courseDataService;
     }

@@ -29,7 +29,7 @@ class TimetableServiceTest {
     private static final Logger logger_test = LoggerFactory.getLogger(TimetableServiceTest.class);
 
     @Mock
-    private UserService userService;
+    private Userservice userService;
 
     @Mock
     private CourseDataService courseDataService;
@@ -63,6 +63,7 @@ class TimetableServiceTest {
                 .major("Global Business & Technology")
                 .doubleMajor("AI융합전공")
                 .build();
+
 
         sampleUserSelections = UserCourseSelectionEntity.builder()
                 .user(sampleUser)

@@ -3,7 +3,7 @@ package com.cesco.scheduly.controller;
 import com.cesco.scheduly.dto.ApiResponse;
 import com.cesco.scheduly.dto.timetable.*; // 모든 timetable DTO 포함
 import com.cesco.scheduly.service.TimetableService;
-import com.cesco.scheduly.service.UserService;
+import com.cesco.scheduly.service.Userservice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,9 +16,9 @@ import java.util.List;
 public class TimetableController {
 
     private final TimetableService timetableService;
-    private final UserService userService;
+    private final Userservice userService;
 
-    public TimetableController(TimetableService timetableService, UserService userService) {
+    public TimetableController(TimetableService timetableService, Userservice userService) {
         this.timetableService = timetableService;
         this.userService = userService;
     }

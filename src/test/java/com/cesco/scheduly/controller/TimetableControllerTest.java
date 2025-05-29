@@ -2,7 +2,7 @@ package com.cesco.scheduly.controller;
 
 import com.cesco.scheduly.dto.timetable.*;
 import com.cesco.scheduly.service.TimetableService;
-import com.cesco.scheduly.service.UserService;
+import com.cesco.scheduly.service.Userservice;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,7 +47,7 @@ public class TimetableControllerTest {
     private TimetableService timetableService;
 
     @MockBean
-    private UserService userService;
+    private Userservice userService;
 
     private String testUserId;
     private TimePreferenceRequest timePreferenceRequest;

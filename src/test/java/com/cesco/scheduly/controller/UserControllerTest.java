@@ -7,7 +7,7 @@ import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.exception.InvalidInputException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.service.CourseDataService;
-import com.cesco.scheduly.service.UserService;
+import com.cesco.scheduly.service.Userservice;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,7 +45,7 @@ public class UserControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private UserService userService;
+    private Userservice userService;
 
     @MockBean
     private CourseDataService courseDataService;
