@@ -1,138 +1,188 @@
 package com.cesco.scheduly.service;
 
 import com.cesco.scheduly.dto.course.CourseInfo;
-import org.junit.jupiter.api.BeforeEach;
+import com.cesco.scheduly.model.DetailedCourseInfo;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-
-@ExtendWith(MockitoExtension.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS) // @BeforeAll을 non-static으로 사용
+@ExtendWith(MockitoExtension.class) // Mockito 기능 활성화 (현재는 @InjectMocks만 사용)
 class CourseDataServiceTest {
 
-    // @InjectMocks 대신 @Spy를 사용하여 실제 객체의 일부 동작을 유지하거나 변경
-    // 하지만 이 경우 @PostConstruct가 자동으로 호출되지 않을 수 있으므로,
-    // 로딩 로직을 직접 테스트하거나, searchCourses 테스트를 위해 내부 상태를 수동 설정합니다.
-    @Spy // 실제 CourseDataService 객체를 생성. PostConstruct는 테스트 환경에 따라 동작이 다를 수 있음.
-    @InjectMocks // @Spy와 함께 사용하여 Mock 객체 주입도 가능 (필요시)
+    @InjectMocks // CourseDataService의 실제 인스턴스를 생성하고 테스트합니다.
     private CourseDataService courseDataService;
 
-    // CourseDataService 내부의 courseCatalogForSearch를 직접 제어하기 위해 Map을 준비
-    private Map<String, CourseInfo> testCourseCatalog;
+    // 테스트용 JSON 파일에 있는 실제 데이터 기반으로 학수번호 설정
+    // 학생의 everytime_final.json 내용에 맞춰 수정 필요
+    private String sampleCourseCodeMajor = "M01207101"; // 예: 머신러닝 (전공)
+    private String sampleCourseCodeGE = "G01001001";    // 예: 교양과목
+    private String sampleCourseCodeRestricted = "Y11113E11"; // 예: 신입생세미나
 
-    @BeforeEach
+    @BeforeAll
     void setUp() {
-        // 테스트용 데이터로 courseCatalogForSearch를 직접 초기화
-        testCourseCatalog = new ConcurrentHashMap<>();
-        CourseInfo course1 = new CourseInfo("CS101", "Introduction to Programming", "전공", 3, "1");
-        CourseInfo course2 = new CourseInfo("MA202", "Calculus I", "교양", 3, "1");
-        CourseInfo course3 = new CourseInfo("HIS101", "World History", "교양", 2, "전학년");
-        CourseInfo course4 = new CourseInfo("CSNULL", null, "전공", 3, "2"); // 이름이 null인 경우 테스트
-        CourseInfo course5 = new CourseInfo(null, "No Code Course", "교양", 3, "2"); // 코드가 null인 경우 테스트
-
-        testCourseCatalog.put(course1.getCourseCode(), course1);
-        testCourseCatalog.put(course2.getCourseCode(), course2);
-        testCourseCatalog.put(course3.getCourseCode(), course3);
-        // course4, course5와 같이 null 값을 가진 데이터는 search 로직에서 문제를 일으킬 수 있으므로,
-        // CourseDataService의 searchCourses 로직에서 null 체크가 중요합니다.
-        // 또는 CourseDataService 로딩 시점에 이런 데이터를 필터링해야 합니다.
-        // 현재 CourseDataService는 이미 필터링 로직이 있으므로, 여기에 null 값을 가진 CourseInfo를 넣으면 안됩니다.
-        // 만약 넣고 테스트한다면 searchCourses의 방어 로직을 검증하는 테스트가 됩니다.
-
-        // CourseDataService의 courseCatalogForSearch 필드를 테스트용 Map으로 교체 (리플렉션 사용 또는 테스트용 setter 필요)
-        // 여기서는 courseDataService가 실제 JSON을 로드하고, 그 결과를 기반으로 테스트한다고 가정하고,
-        // loadAndProcessCourseData가 올바르게 courseCatalogForSearch를 채웠다고 가정하겠습니다.
-        // 만약 loadAndProcessCourseData 자체를 단위 테스트하고 싶다면, 파일 I/O를 모킹해야 합니다.
-
-        // 가장 확실한 단위 테스트 방법은 @PostConstruct 로직을 테스트에서는 비활성화하고,
-        // 테스트 데이터를 수동으로 주입하는 것입니다.
-        // 예시: courseDataService의 내부 상태를 직접 설정할 수 있는 package-private 메소드를 만들거나,
-        // @Spy와 doReturn을 사용하여 searchCourses가 사용할 catalog를 제어합니다.
-
-        // 여기서는 courseDataService의 loadAndProcessCourseData()가 실행되어
-        // 실제 src/main/resources/data/everytime_courses.json 또는
-        // src/test/resources/data/everytime_courses.json (만약 있다면 우선순위)
-        // 파일을 읽어 courseCatalogForSearch가 채워진다고 가정하고 진행합니다.
-        // 이 테스트가 성공하려면 JSON 파일에 "Introduction to Programming" 등의 데이터가 있어야 합니다.
-        courseDataService.loadAndProcessCourseData(); // @PostConstruct가 실행되도록 명시적 호출 (테스트 환경에 따라 동작 보장 안 될 수 있음)
-        // 혹은 @SpringBootTest 환경에서는 자동 실행됨.
-        // JUnit5 + MockitoExtension 만으로는 @PostConstruct 보장 안됨.
-        // 따라서 아래 searchCourses 테스트는 실제 파일 내용에 매우 의존적임.
+        // @PostConstruct가 테스트 환경에서 Spring 컨텍스트 없이 자동으로 호출되지 않을 수 있으므로,
+        // 명시적으로 데이터 로딩 메소드를 호출합니다.
+        // 이 테스트는 src/main/resources/data/everytime_final.json 파일이 존재하고,
+        // 그 내용이 CourseDataService의 로딩 로직과 호환된다고 가정합니다.
+        try {
+            courseDataService.loadAndProcessCourseData();
+        } catch (Exception e) {
+            fail("CourseDataService 데이터 로딩 중 예외 발생: " + e.getMessage());
+        }
+        // 로드된 데이터가 있는지 기본적인 확인
+        assertFalse(courseDataService.getDetailedCourses().isEmpty(), "강의 데이터가 로드되지 않았거나 비어있습니다.");
     }
 
     @Test
-    @DisplayName("강의 검색 테스트 - 교과목명 일치")
-    void searchCourses_ByName_ExactMatch() {
-        // 실제 JSON 파일에 "머신러닝" 과목이 있다고 가정
+    @DisplayName("강의 데이터 로딩 후 groupId 생성 테스트")
+    void loadAndProcessCourseData_ShouldCreateGroupId() {
+        Optional<DetailedCourseInfo> courseOpt = courseDataService.getDetailedCourses().stream()
+                .filter(c -> c.getCourseCode().equals(sampleCourseCodeMajor)) // "M01207101"
+                .findFirst();
+        assertTrue(courseOpt.isPresent(), sampleCourseCodeMajor + " 과목을 찾을 수 없습니다.");
+        courseOpt.ifPresent(course -> {
+            assertNotNull(course.getGroupId(), "GroupId가 생성되어야 합니다.");
+            assertEquals(sampleCourseCodeMajor.substring(0, 7), course.getGroupId(), "GroupId가 학수번호 앞 7자리와 일치해야 합니다.");
+        });
+    }
+
+    @Test
+    @DisplayName("강의 데이터 로딩 후 generalizedType 1차 분류 테스트")
+    void loadAndProcessCourseData_ShouldSetGeneralizedType() {
+        // JSON 파일의 실제 "개설영역" 값과 determineInitialGeneralizedType 로직에 따라 기대값 설정
+        DetailedCourseInfo majorCourse = courseDataService.getDetailedCourseByCode(sampleCourseCodeMajor); // "개설영역": "전공" 예상
+        DetailedCourseInfo geCourse = courseDataService.getDetailedCourseByCode(sampleCourseCodeGE);       // "개설영역": "교양" 또는 관련 키워드 예상
+        DetailedCourseInfo restrictedCourse = courseDataService.getDetailedCourseByCode(sampleCourseCodeRestricted); // "개설영역": "신입생세미나" 예상
+
+        assertNotNull(majorCourse, sampleCourseCodeMajor + " 과목 정보 없음");
+        assertEquals("전공_후보", majorCourse.getGeneralizedType(), "'전공' 개설영역은 '전공_후보'로 1차 분류되어야 합니다.");
+
+        assertNotNull(geCourse, sampleCourseCodeGE + " 과목 정보 없음");
+        assertEquals("교양", geCourse.getGeneralizedType(), "'교양' 관련 개설영역은 '교양'으로 1차 분류되어야 합니다.");
+
+        assertNotNull(restrictedCourse, sampleCourseCodeRestricted + " 과목 정보 없음");
+        assertEquals("신입생세미나", restrictedCourse.getGeneralizedType(), "'신입생세미나' 개설영역은 해당 타입으로 1차 분류되어야 합니다.");
+        assertTrue(restrictedCourse.isRestrictedCourse(), "'신입생세미나'는 제한 과목으로 처리되어야 합니다.");
+    }
+
+
+    @Test
+    @DisplayName("강의 검색 테스트 - 교과목명 '머신러닝' 포함 (실제 데이터 기반)")
+    void searchCourses_ByName_Containing_MachineLearning() {
         List<CourseInfo> results = courseDataService.searchCourses("머신러닝", null, null);
-        assertFalse(results.isEmpty(), "머신러닝 검색 결과가 없습니다. JSON 파일을 확인하세요.");
-        assertTrue(results.stream().anyMatch(c -> "머신러닝".equals(c.getCourseName())));
+        assertNotNull(results);
+        // 학생이 제공한 정보: "머신러닝" 포함 과목 3개
+        assertEquals(3, results.size(), "JSON 파일 기준 '머신러닝' 포함 과목은 3개여야 합니다.");
+        List<String> expectedCodes = Arrays.asList("T04482101", "M01207101", "P05412101");
+        List<String> actualCodes = results.stream().map(CourseInfo::getCourseCode).collect(Collectors.toList());
+        assertTrue(actualCodes.containsAll(expectedCodes) && expectedCodes.containsAll(actualCodes), "검색된 '머신러닝' 과목 학수번호 불일치");
     }
 
     @Test
-    @DisplayName("강의 검색 테스트 - 교과목명 부분 일치")
-    void searchCourses_ByName_PartialMatch() {
-        // 실제 JSON 파일에 "프로그래밍"을 포함하는 과목이 있다고 가정 (예: 고급파이썬프로그래밍)
-        List<CourseInfo> results = courseDataService.searchCourses("프로그래밍", null, null);
-        assertFalse(results.isEmpty(), "프로그래밍 포함 검색 결과가 없습니다.");
-        assertTrue(results.stream().anyMatch(c -> c.getCourseName().contains("프로그래밍")));
+    @DisplayName("강의 검색 테스트 - 교과목명 '알고리즘' 포함 (실제 데이터 기반)")
+    void searchCourses_ByName_PartialMatch_Algorithm() {
+        List<CourseInfo> results = courseDataService.searchCourses("알고리즘", null, null);
+        assertNotNull(results);
+        // 학생이 제공한 정보: "알고리즘" 포함 과목 7개
+        assertEquals(7, results.size(), "JSON 파일 기준 '알고리즘' 포함 과목은 7개여야 합니다.");
+        assertTrue(results.stream().allMatch(c -> c.getCourseName().toLowerCase().contains("알고리즘")));
     }
 
     @Test
-    @DisplayName("강의 검색 테스트 - 개설영역 일치")
-    void searchCourses_ByDepartment() {
-        // 실제 JSON 파일에 "전공" 영역 과목이 있다고 가정
-        List<CourseInfo> results = courseDataService.searchCourses(null, "전공", null);
-        assertFalse(results.isEmpty(), "전공 검색 결과가 없습니다.");
-        assertTrue(results.stream().allMatch(c -> c.getDepartment().equals("전공")));
+    @DisplayName("강의 검색 테스트 - 개설영역 '교양' (원본 필드 정확히 일치 시, 결과 없음)")
+    void searchCourses_ByDepartment_OriginalGeneralEducation_ExpectingEmpty() {
+        // 학생 정보: 원본 "개설영역"이 정확히 "교양"인 과목은 없음
+        List<CourseInfo> results = courseDataService.searchCourses(null, "교양", null);
+        assertNotNull(results);
+        assertTrue(results.isEmpty(), "원본 '개설영역'이 정확히 '교양'인 과목은 없어야 합니다.");
     }
 
     @Test
-    @DisplayName("강의 검색 테스트 - 학년 일치")
-    void searchCourses_ByGrade() {
-        // 실제 JSON 파일에 "2"학년 과목이 있다고 가정
-        List<CourseInfo> results = courseDataService.searchCourses(null, null, "2");
-        assertFalse(results.isEmpty(), "2학년 검색 결과가 없습니다.");
-        assertTrue(results.stream().allMatch(c -> c.getGrade().contains("2") || c.getGrade().equals("전학년")));
+    @DisplayName("강의 검색 테스트 - 개설영역 '대학외국어' (실제 데이터 확인 필요)")
+    void searchCourses_ByDepartment_UniversityForeignLanguage() {
+        List<CourseInfo> results = courseDataService.searchCourses(null, "대학외국어", null);
+        assertNotNull(results);
+        // 학생의 JSON 파일에서 "개설영역": "대학외국어"인 과목의 실제 개수를 확인하여 `expectedCount` 설정
+        long expectedCount = courseDataService.getDetailedCourses().stream()
+                .filter(c -> "대학외국어".equals(c.getDepartmentOriginal()))
+                .count();
+        assertEquals(expectedCount, results.size(), "'대학외국어' 과목 검색 결과 개수가 실제 데이터와 일치해야 합니다.");
+        if (expectedCount > 0) {
+            assertTrue(results.stream().allMatch(c-> "대학외국어".equals(c.getDepartment())));
+        }
     }
 
     @Test
-    @DisplayName("강의 검색 테스트 - 결과 없음")
-    void searchCourses_NoResults() {
-        List<CourseInfo> results = courseDataService.searchCourses("매우특이하고없는과목명12345", null, null);
-        assertTrue(results.isEmpty());
+    @DisplayName("강의 검색 테스트 - 학년 '1' (실제 데이터 기반)")
+    void searchCourses_ByGrade_FirstYear() {
+        // 학생 정보: "학년" 필드는 "null", "1", "2", "3", "4". "전학년" 없음.
+        List<CourseInfo> results = courseDataService.searchCourses(null, null, "1");
+        assertNotNull(results);
+
+        long expectedCount = courseDataService.getDetailedCourses().stream()
+                .filter(c -> "1".equals(c.getGrade())) // CourseInfo.grade는 로딩 시 trim됨
+                .map(DetailedCourseInfo::getCourseCode)
+                .distinct() // CourseInfo는 학수번호 기준이므로
+                .count();
+
+        if (expectedCount > 0) {
+            assertFalse(results.isEmpty(), "'1학년' 과목 검색 결과가 없으면 안 됩니다 (JSON 파일에 1학년 과목이 있다면).");
+            assertEquals(expectedCount, results.size(), "'1학년' 과목 검색 결과 개수가 실제 데이터와 일치해야 합니다.");
+            assertTrue(results.stream().allMatch(c -> c.getGrade() != null && c.getGrade().equals("1")));
+        } else {
+            assertTrue(results.isEmpty(), "JSON 파일에 '1학년' 과목이 없다면 검색 결과는 비어있어야 합니다.");
+        }
+        // 특정 1학년 과목 포함 여부 확인 (예: Y11113E11)
+        boolean foundSpecific = results.stream().anyMatch(c -> "Y11113E11".equals(c.getCourseCode()));
+        if (courseDataService.getCourseInfoByCode("Y11113E11") != null && "1".equals(courseDataService.getCourseInfoByCode("Y11113E11").getGrade())) {
+            assertTrue(foundSpecific, "'신입생세미나(자유전공학부)' (Y11113E11) 과목이 검색되어야 합니다.");
+        }
     }
 
     @Test
-    @DisplayName("강의 검색 테스트 - 쿼리가 null 또는 빈 문자열일 때 모든 결과 반환 (또는 특정 정책)")
-    void searchCourses_NullOrEmptyQuery() {
-        List<CourseInfo> resultsWithNullQuery = courseDataService.searchCourses(null, null, null);
-        List<CourseInfo> resultsWithEmptyQuery = courseDataService.searchCourses("", null, null);
+    @DisplayName("강의 검색 테스트 - 학년 '정보없음' (실제 null 또는 빈 학년 정보)")
+    void searchCourses_ByGrade_InfoMissing() {
+        List<CourseInfo> results = courseDataService.searchCourses(null, null, "정보없음");
+        assertNotNull(results);
 
-        // 현재 searchCourses는 query가 null이거나 비면 nameMatch가 true가 되므로 전체 결과 반환
-        assertFalse(resultsWithNullQuery.isEmpty(), "Null 쿼리 시 결과가 있어야 합니다 (courseCatalogForSearch 크기만큼).");
-        assertEquals(courseDataService.courseCatalogForSearch.size(), resultsWithNullQuery.size());
-        assertEquals(courseDataService.courseCatalogForSearch.size(), resultsWithEmptyQuery.size());
+        long expectedCount = courseDataService.getDetailedCourses().stream()
+                .filter(c -> "정보없음".equals(c.getGrade()))
+                .map(DetailedCourseInfo::getCourseCode)
+                .distinct()
+                .count();
+
+        assertEquals(expectedCount, results.size(), "학년이 '정보없음'인 과목 검색 결과 개수가 실제 데이터와 일치해야 합니다.");
+        if (expectedCount > 0) {
+            assertTrue(results.stream().allMatch(c -> "정보없음".equals(c.getGrade())));
+        }
     }
 
-
     @Test
-    @DisplayName("개설영역 일반화 타입 매핑 테스트")
-    void mapDepartmentToGeneralizedType_Test() {
-        assertEquals("전공", courseDataService.mapDepartmentToGeneralizedType("전공필수"));
-        assertEquals("이중전공", courseDataService.mapDepartmentToGeneralizedType("이중(부)전공"));
-        assertEquals("교양", courseDataService.mapDepartmentToGeneralizedType("교양선택"));
-        assertEquals("교직", courseDataService.mapDepartmentToGeneralizedType("교직"));
-        assertEquals("기타", courseDataService.mapDepartmentToGeneralizedType("특별활동"));
-        assertEquals("기타", courseDataService.mapDepartmentToGeneralizedType(null));
+    @DisplayName("determineInitialGeneralizedType 메소드 테스트")
+    void determineInitialGeneralizedType_TestCases() {
+        assertEquals("전공_후보", courseDataService.determineInitialGeneralizedType("전공"));
+        assertEquals("전공_후보", courseDataService.determineInitialGeneralizedType("컴퓨터공학부")); // "학부" 포함 -> "전공_후보" 예상 (현재 로직)
+        assertEquals("이중전공", courseDataService.determineInitialGeneralizedType("이중(부)전공")); // "이중" 우선
+        assertEquals("이중전공", courseDataService.determineInitialGeneralizedType("이중(제2)"));
+        assertEquals("교양", courseDataService.determineInitialGeneralizedType("교양"));
+        assertEquals("교양", courseDataService.determineInitialGeneralizedType("대학외국어"));
+        assertEquals("교직", courseDataService.determineInitialGeneralizedType("교직"));
+        assertEquals("신입생세미나", courseDataService.determineInitialGeneralizedType("신입생세미나"));
+        assertEquals("군사학", courseDataService.determineInitialGeneralizedType("군사학"));
+        assertEquals("기타", courseDataService.determineInitialGeneralizedType("알수없는영역"));
+        assertEquals("기타", courseDataService.determineInitialGeneralizedType(null));
+        assertEquals("기타", courseDataService.determineInitialGeneralizedType("  "));
     }
 }

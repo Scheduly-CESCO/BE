@@ -12,25 +12,27 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient; // lenient() 사용
 import static org.mockito.Mockito.when;
-// import static org.mockito.Mockito.lenient; // lenient 사용 시
+// import static org.mockito.ArgumentMatchers.any; // 필요시 사용
 
 @ExtendWith(MockitoExtension.class)
 class TimetableServiceTest {
+    private static final Logger logger_test = LoggerFactory.getLogger(TimetableServiceTest.class);
 
     @Mock
     private Userservice userService;
 
     @Mock
-    private CourseDataService courseDataService; // TimetableService가 CourseDataService를 사용함
+    private CourseDataService courseDataService;
 
     @InjectMocks
     private TimetableService timetableService;
@@ -38,33 +40,49 @@ class TimetableServiceTest {
     private UserEntity sampleUser;
     private UserCourseSelectionEntity sampleUserSelections;
     private UserPreferenceEntity sampleUserPreferences;
-    private List<DetailedCourseInfo> sampleAllCourses;
+    private List<DetailedCourseInfo> allSampleCoursesSetup;
+
+    // 학수번호 정의
+    private final String gbtMajorCode1 = "D01205A01"; // 회계원리	3	3	김문현	월 1 2 3 (4403)
+    private final String gbtMajorCode2 = "P05208101"; // 객체지향프로그래밍	3	3	한영진	수 4 5 6 (4212)
+    private final String gbtMajorCode3 = "P05201101"; // 데이터구조	3	3	이근섭	목 7 8 9 (4207)
+    private final String gbtMajorCode4Conflict = "P05209101"; // AI를위한기초알고리즘	3	3	배주호	수 4 5 6 (4207)
+    private final String aiDoubleMajorCode1 = "V41009201"; // 운영체제	3	3	임승호	목 1 2 3 (5309)
+    private final String geCourseCode1 = "U72247301";    // 에스페란토어의이해	2	2	신현규	목 3 4 (2506)
+    private final String geCourseCode2 = "U76002101";    // 위대한개츠비로본문학비평이론	2	2	김윤정	수 7 8 (2410)
+    private final String geCourseCode3 = "U51416101";    // 생활과화학	2	2	김민선	목 5 6 (2409)
+    private final String selfSelectionCandidateCode = "O02210101"; // 현대일본어표현활용	2	2	박민영	수 1 2 (1506)
+    private final String restrictedSeminarCode = "Y11113901"; // 신입생세미나(GBT)	1	1	김병초	월 9 (4403)
+    private final String takenCourseCode = "Y12101601"; // 미네르바인문(1)읽기와 쓰기	3	3	나영남	월 1 2 3 (2313)
 
     @BeforeEach
     void setUp() {
-        sampleUser = UserEntity.builder().Id(Long.valueOf("user1")).grade("2").major("컴퓨터공학부").build();
+        sampleUser = UserEntity.builder()
+                .userId("userTest01")
+                .grade("3")
+                .major("Global Business & Technology")
+                .doubleMajor("AI융합전공")
+                .build();
 
-        List<String> mandatoryCodes = List.of("CS101");
-        List<String> takenCodes = List.of("OLD101");
-        List<String> retakeCodes = new ArrayList<>();
 
         sampleUserSelections = UserCourseSelectionEntity.builder()
                 .user(sampleUser)
-                .mandatoryCourses(mandatoryCodes)
-                .takenCourses(takenCodes)
-                .retakeCourses(retakeCodes)
+                .mandatoryCourses(new ArrayList<>())
+                .takenCourses(List.of(takenCourseCode))
+                .retakeCourses(new ArrayList<>())
                 .build();
 
         TimePreferenceRequest timePrefs = new TimePreferenceRequest();
 
         CreditSettingsRequest creditSettings = new CreditSettingsRequest();
-        creditSettings.setMinTotalCredits(15);
-        creditSettings.setMaxTotalCredits(21);
-        creditSettings.setCourseTypeCombination(List.of("전공", "교양"));
-        creditSettings.setCreditRangesPerType(Map.of(
-                "전공", new CreditRangeDto(9, 15),
-                "교양", new CreditRangeDto(3, 6)
-        ));
+        creditSettings.setMinTotalCredits(10); // 테스트 시나리오에 맞게 조정될 수 있음
+        creditSettings.setMaxTotalCredits(18);
+        Map<String, CreditRangeDto> goals = new HashMap<>();
+        goals.put("전공", new CreditRangeDto(3, 9)); // 기본값, 테스트에서 오버라이드
+        goals.put("이중전공", new CreditRangeDto(0, 6));
+        goals.put("교양", new CreditRangeDto(1, 6));
+        goals.put("자선", new CreditRangeDto(0, 3));
+        creditSettings.setCreditGoalsPerType(goals);
 
         sampleUserPreferences = UserPreferenceEntity.builder()
                 .user(sampleUser)
@@ -72,70 +90,64 @@ class TimetableServiceTest {
                 .creditSettings(creditSettings)
                 .build();
 
-        DetailedCourseInfo cs101 = new DetailedCourseInfo("CS101", "전공필수과목", "전공", "전공", 3, 3, "1", "교수A", "101", "기초", List.of(new TimeSlotDto("Mon", List.of(1,2,3))), false);
-        DetailedCourseInfo ge101 = new DetailedCourseInfo("GE101", "교양필수1", "교양", "교양", 3, 3, "1", "교수B", "201", "", List.of(new TimeSlotDto("Mon", List.of(4,5,6))), false);
-        DetailedCourseInfo ge102 = new DetailedCourseInfo("GE102", "교양선택2", "교양", "교양", 2, 2, "전학년", "교수C", "202", "", List.of(new TimeSlotDto("Tue", List.of(1,2,3))), false);
-        DetailedCourseInfo major201 = new DetailedCourseInfo("CS201", "전공선택1", "전공", "전공", 3, 3, "2", "교수D", "301", "", List.of(new TimeSlotDto("Wed", List.of(1,2,3))), false);
-        DetailedCourseInfo major202 = new DetailedCourseInfo("CS202", "전공선택2", "전공", "전공", 3, 3, "2", "교수E", "302", "", List.of(new TimeSlotDto("Wed", List.of(4,5,6))), false);
-        DetailedCourseInfo noTimeCourse = new DetailedCourseInfo("NT101", "시간정보없는교양", "교양", "교양", 1, 1, "1", "교수F", "미정", "", Collections.emptyList(), false);
-        DetailedCourseInfo militaryCourse = new DetailedCourseInfo("MIL101", "군사학1", "군사학", "군사학", 2, 2, "1", "교수G", "군사교육관", "", List.of(new TimeSlotDto("Thu", List.of(7,8))), true);
+        // DetailedCourseInfo 샘플 (groupId, specificMajor, generalizedType, isRestrictedCourse 포함)
+        // CourseDataService에서 로드 시 generalizedType, isRestrictedCourse, groupId가 채워진다고 가정
+        allSampleCoursesSetup = new ArrayList<>(List.of(
+                new DetailedCourseInfo(gbtMajorCode1, "회계원리", "전공", "Global Business & Technology", "D01205A", "전공", 3, 3, "2", "김GBT", "경101", "GBT주전공", List.of(new TimeSlotDto("Mon", List.of(1,2,3))), false),
+                new DetailedCourseInfo(gbtMajorCode2, "객체지향프로그래밍", "전공", "Global Business & Technology", "P052081", "전공", 3, 3, "3", "이GBT", "경102", "GBT실무와 동일과목군", List.of(new TimeSlotDto("Tue", List.of(1,2,3))), false),
+                new DetailedCourseInfo(gbtMajorCode3, "데이터구조", "전공", "Global Business & Technology", "P052011", "전공", 3, 3, "3", "박GBT", "경103", "GBT주전공", List.of(new TimeSlotDto("Wed", List.of(1,2,3))), false),
+                new DetailedCourseInfo(gbtMajorCode4Conflict, "AI를위한기초알고리즘", "전공", "Global Business & Technology", "P052091", "전공", 3, 3, "3", "조GBT", "경104", "GBT주전공", List.of(new TimeSlotDto("Mon", List.of(2,3,4))), false),
+                new DetailedCourseInfo(aiDoubleMajorCode1, "운영체제", "전공", "AI융합전공", "V410092", "이중전공", 3, 3, "2", "최AI", "공101", "AI융합개설", List.of(new TimeSlotDto("Mon", List.of(4,5,6))), false),
+                new DetailedCourseInfo(geCourseCode1, "에스페란토어의이해", "교양", null, "U722473", "교양", 2, 2, "1", "박교양", "교101", "", List.of(new TimeSlotDto("Mon", List.of(7,8))), false),
+                new DetailedCourseInfo(geCourseCode2, "위대한개츠비로본문학비평이론", "교양", null, "U760021", "교양", 1, 1, "2", "이교양", "교102", "", List.of(new TimeSlotDto("Tue", List.of(7))), false),
+                new DetailedCourseInfo(geCourseCode3, "생활과화학", "교양", null, "U514161", "교양", 3, 3, "1", "김교양", "교103", "", List.of(new TimeSlotDto("Fri", List.of(1,2,3))), false),
+                new DetailedCourseInfo(selfSelectionCandidateCode, "현대일본어표현활용", "전공", "일본어통번역학과", "O022101", "자선", 3, 3, "2", "강경제", "상101", "타과생수강가능", List.of(new TimeSlotDto("Thu", List.of(1,2,3))), false),
+                new DetailedCourseInfo(restrictedSeminarCode, "신입생세미나", "신입생세미나", "자유전공학부", "Y111139", "신입생세미나", 1, 1, "1", "학부장", "셈A", "자유전공필참", List.of(new TimeSlotDto("Fri", List.of(4))), true),
+                new DetailedCourseInfo(takenCourseCode, "미네르바인문(1)읽기와 쓰기", "교양", null, "Y121016", "교양", 3, 3, "1", "이교수", "교202", "", List.of(new TimeSlotDto("Mon", List.of(8,9))), false)
+        ));
 
-
-        sampleAllCourses = new ArrayList<>(List.of(cs101, ge101, ge102, major201, major202, noTimeCourse, militaryCourse));
+        when(courseDataService.getDetailedCourses()).thenReturn(new ArrayList<>(allSampleCoursesSetup));
+        // getDetailedCourseByCode는 필요한 테스트에서만 설정 (UnnecessaryStubbing 방지)
     }
 
     @Test
-    @DisplayName("기본 시간표 추천 생성 테스트 - 필수 과목 포함")
-    void generateRecommendations_WithMandatoryCourse() {
+    @DisplayName("기본 추천: 주전공(GBT 6학점), 이중전공(AI 3학점), 교양(3학점) 목표 만족")
+    void generateRecommendations_SatisfySetGoals() {
         // Arrange
+        CreditSettingsRequest settings = new CreditSettingsRequest();
+        settings.setMinTotalCredits(12);
+        settings.setMaxTotalCredits(12); // 정확히 12학점 목표
+        Map<String, CreditRangeDto> goals = new HashMap<>();
+        goals.put("전공", new CreditRangeDto(6, 6));     // GBT 실무(3) + GBT 마케팅(3) = 6
+        goals.put("이중전공", new CreditRangeDto(3, 3)); // AI 프로그래밍(3) = 3
+        goals.put("교양", new CreditRangeDto(3, 3));     // 교양선택C(3) = 3
+        settings.setCreditGoalsPerType(goals);
+        sampleUserPreferences.setCreditSettings(settings);
+
         when(userService.getUserDetails(anyString())).thenReturn(sampleUser);
         when(userService.getUserCourseSelection(anyString())).thenReturn(sampleUserSelections);
         when(userService.getUserPreference(anyString())).thenReturn(sampleUserPreferences);
-        when(courseDataService.getDetailedCourses()).thenReturn(new ArrayList<>(sampleAllCourses));
-        // TimetableService가 DetailedCourseInfo.getGeneralizedType()을 사용하므로,
-        // CourseDataService.mapDepartmentToGeneralizedType()에 대한 스터빙은 여기서 필요 없습니다.
-        // 만약 TimetableService 내부에서 CourseDataService의 mapDepartmentToGeneralizedType을 명시적으로 호출한다면 필요합니다.
-        // (현재 TimetableService 코드는 DetailedCourseInfo에 이미 매핑된 generalizedType을 사용하거나,
-        //  헬퍼 메소드 내부에서 courseDataService.mapDepartmentToGeneralizedType을 호출하도록 되어 있습니다.
-        //  테스트의 일관성을 위해 TimetableService 내에서 generalizedType을 어떻게 얻는지 확인하고,
-        //  만약 courseDataService.mapDepartmentToGeneralizedType을 호출한다면 아래와 같이 모킹합니다.)
-        // when(courseDataService.mapDepartmentToGeneralizedType("전공")).thenReturn("전공");
-        // when(courseDataService.mapDepartmentToGeneralizedType("교양")).thenReturn("교양");
-        // when(courseDataService.mapDepartmentToGeneralizedType("군사학")).thenReturn("군사학"); // 예시
-        // when(courseDataService.mapDepartmentToGeneralizedType(null)).thenReturn("기타");
+        // getDetailedCourseByCode는 TimetableService.prepareCandidateCourses 내부에서 호출될 수 있음
+        allSampleCoursesSetup.forEach(course ->
+                lenient().when(courseDataService.getDetailedCourseByCode(course.getCourseCode())).thenReturn(course)
+        );
 
         // Act
-        List<RecommendedTimetableDto> recommendations = timetableService.generateRecommendations("user1");
+        List<RecommendedTimetableDto> recommendations = timetableService.generateRecommendations(sampleUser.getUserId());
 
         // Assert
         assertNotNull(recommendations);
+        assertFalse(recommendations.isEmpty(), "주/이중/교양 학점 목표를 만족하는 추천이 1개 이상 생성되어야 합니다. 실제 추천 수: " + recommendations.size());
+
         if (!recommendations.isEmpty()) {
-            RecommendedTimetableDto firstRecommendation = recommendations.get(0);
-            System.out.println("추천된 시간표 ID: " + firstRecommendation.getTimetableId());
-            firstRecommendation.getScheduledCourses().forEach(course ->
-                    System.out.println(String.format("  - %s (%s): %s학점, 타입:%s, 시간:%s", course.getCourseName(), course.getCourseCode(), course.getCredits(), course.getDepartment(), course.getActualClassTimes()))
-            );
-            System.out.println("  총 학점: " + firstRecommendation.getTotalCredits());
-            System.out.println("  유형별 학점: " + firstRecommendation.getCreditsByType());
+            RecommendedTimetableDto firstRec = recommendations.get(0);
+            logger_test.info("추천 결과 (주/이중/교양): {}", firstRec.getScheduledCourses().stream().map(ScheduledCourseDto::getCourseName).collect(Collectors.toList()));
+            logger_test.info("학점: 총 {}, 유형별: {}", firstRec.getTotalCredits(), firstRec.getCreditsByType());
 
-            assertTrue(firstRecommendation.getScheduledCourses().stream()
-                    .anyMatch(c -> "CS101".equals(c.getCourseCode())), "필수 과목 CS101이 포함되어야 합니다.");
-
-            CreditSettingsRequest settings = sampleUserPreferences.getCreditSettings();
-            assertTrue(firstRecommendation.getTotalCredits() >= settings.getMinTotalCredits(), "최소 총 학점(" + settings.getMinTotalCredits() + ") 미달: " + firstRecommendation.getTotalCredits());
-            assertTrue(firstRecommendation.getTotalCredits() <= settings.getMaxTotalCredits(), "최대 총 학점(" + settings.getMaxTotalCredits() + ") 초과: " + firstRecommendation.getTotalCredits());
-
-            Map<String, CreditRangeDto> typeRanges = settings.getCreditRangesPerType();
-            for(Map.Entry<String, Integer> entry : firstRecommendation.getCreditsByType().entrySet()){
-                String type = entry.getKey();
-                Integer actualCredits = entry.getValue();
-                if(typeRanges != null && typeRanges.containsKey(type)){ // typeRanges가 null이 아니고, 해당 타입에 대한 설정이 있을 때만 검증
-                    assertTrue(actualCredits >= typeRanges.get(type).getMin(), type + " 유형 최소 학점 미달: 실제 " + actualCredits + ", 최소 " + typeRanges.get(type).getMin());
-                    assertTrue(actualCredits <= typeRanges.get(type).getMax(), type + " 유형 최대 학점 초과: 실제 " + actualCredits + ", 최대 " + typeRanges.get(type).getMax());
-                }
-            }
-        } else {
-            fail("기본 시나리오에서 추천 시간표가 생성되지 않았습니다. 알고리즘 또는 데이터 설정을 확인하세요.");
+            assertEquals(12, firstRec.getTotalCredits(), "총 학점이 일치해야 합니다.");
+            assertEquals(6, firstRec.getCreditsByType().getOrDefault("전공", 0));
+            assertEquals(3, firstRec.getCreditsByType().getOrDefault("이중전공", 0));
+            assertEquals(3, firstRec.getCreditsByType().getOrDefault("교양", 0));
         }
     }
 
@@ -143,23 +155,67 @@ class TimetableServiceTest {
     @DisplayName("필수 과목 간 시간 중복 시 예외 발생 테스트")
     void generateRecommendations_MandatoryCoursesConflict() {
         // Arrange
-        DetailedCourseInfo cs101Conflict = new DetailedCourseInfo("CS101", "전공필수과목", "전공", "전공", 3, 3, "1", "교수A", "101", "기초", List.of(new TimeSlotDto("Mon", List.of(1,2,3))), false);
-        DetailedCourseInfo cs102MandatoryConflict = new DetailedCourseInfo("CS102M", "필수충돌과목", "전공", "전공", 3, 3, "1", "교수X", "102", "", List.of(new TimeSlotDto("Mon", List.of(2,3,4))), false);
+        DetailedCourseInfo mandatory1 = allSampleCoursesSetup.stream().filter(c->c.getCourseCode().equals(gbtMajorCode1)).findFirst().get(); // GBT 실무 (Mon 1,2,3)
+        DetailedCourseInfo mandatory2Conflict = allSampleCoursesSetup.stream().filter(c->c.getCourseCode().equals(gbtMajorCode4Conflict)).findFirst().get(); // GBT 프로젝트 (Mon 2,3,4) - 시간 중복
 
-        sampleUserSelections.setMandatoryCourses(List.of("CS101", "CS102M"));
+        sampleUserSelections.setMandatoryCourses(List.of(gbtMajorCode1, gbtMajorCode4Conflict));
 
         when(userService.getUserDetails(anyString())).thenReturn(sampleUser);
         when(userService.getUserCourseSelection(anyString())).thenReturn(sampleUserSelections);
         when(userService.getUserPreference(anyString())).thenReturn(sampleUserPreferences);
-        // 테스트에 필요한 최소 강의만 포함 (CourseDataService가 이 리스트를 반환하도록 모킹)
-        when(courseDataService.getDetailedCourses()).thenReturn(List.of(cs101Conflict, cs102MandatoryConflict, sampleAllCourses.get(1)));
+
+        // 테스트에 필요한 강의 목록만 반환하도록 모킹 (prepareCandidateCourses가 이 리스트를 사용)
+        List<DetailedCourseInfo> conflictTestCourses = List.of(mandatory1, mandatory2Conflict);
+        when(courseDataService.getDetailedCourses()).thenReturn(conflictTestCourses);
+        // getAndValidateMandatoryCourses 내부에서 candidatePool (여기서는 conflictTestCourses)을 사용하므로,
+        // getDetailedCourseByCode 모킹은 필요 없음 (candidatePool에서 직접 가져옴)
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            timetableService.generateRecommendations("user1");
+            timetableService.generateRecommendations(sampleUser.getUserId());
         });
-        assertTrue(exception.getMessage().contains("필수 또는 재수강 과목 간에 시간이 중복됩니다."));
+
+        assertTrue(exception.getMessage().contains("필수 또는 재수강 과목 간에 시간이 중복되거나, 동일 과목이 중복 선택되었습니다. 선택을 조정한 후 다시 시도해주세요."));
     }
 
-    // ... (다른 테스트 케이스들)
+    // ... (generateRecommendations_WithSelfSelectionGoal,
+    //      generateRecommendations_NoDuplicateGroupIdCourses_WhenOneIsMandatory,
+    //      generateRecommendations_RestrictedCourse_TypeSelected_NotMandatory,
+    //      generateRecommendations_RestrictedCourseIsMandatory_ShouldBeIncluded 테스트는 이전 답변의 수정된 형태를 유지하되,
+    //      setUp에서 설정된 sampleAllCourses를 기반으로 데이터를 설정하고,
+    //      필요한 getDetailedCourseByCode 모킹은 lenient()로 처리하거나 각 테스트 내에서 명시적으로 설정합니다.)
+
+    // 예시: 자선 과목 테스트 (필요한 모킹만 설정)
+    @Test
+    @DisplayName("자선 과목 추천 테스트")
+    void generateRecommendations_WithSelfSelectionGoal_ShouldIncludeSelfSelection() {
+        // Arrange
+        CreditSettingsRequest settings = new CreditSettingsRequest();
+        settings.setMinTotalCredits(3); settings.setMaxTotalCredits(3);
+        Map<String, CreditRangeDto> goals = new HashMap<>();
+        goals.put("자선", new CreditRangeDto(3,3));
+        settings.setCreditGoalsPerType(goals);
+        sampleUserPreferences.setCreditSettings(settings);
+        sampleUserSelections.setMandatoryCourses(Collections.emptyList());
+
+        when(userService.getUserDetails(anyString())).thenReturn(sampleUser);
+        when(userService.getUserCourseSelection(anyString())).thenReturn(sampleUserSelections);
+        when(userService.getUserPreference(anyString())).thenReturn(sampleUserPreferences);
+        // getDetailedCourses는 setUp에서 모킹됨
+
+        // Act
+        List<RecommendedTimetableDto> recommendations = timetableService.generateRecommendations(sampleUser.getUserId());
+
+        // Assert
+        assertNotNull(recommendations);
+        assertFalse(recommendations.isEmpty(), "자선 과목을 포함하는 추천이 생성되어야 합니다.");
+        if (!recommendations.isEmpty()) {
+            RecommendedTimetableDto firstRec = recommendations.get(0);
+            logger_test.info("추천 결과 (자선 포함): {}", firstRec.getScheduledCourses().stream().map(sc -> sc.getCourseName() + "(" + sc.getDepartment() + ")").collect(Collectors.toList()));
+            assertEquals(3, firstRec.getCreditsByType().getOrDefault("자선", 0), "자선 과목 학점이 3학점이어야 합니다.");
+            boolean selfSelectCoursePresent = firstRec.getScheduledCourses().stream()
+                    .anyMatch(c -> selfSelectionCandidateCode.equals(c.getCourseCode()) && "자선".equals(c.getDepartment()));
+            assertTrue(selfSelectCoursePresent, selfSelectionCandidateCode + "가 '자선'으로 추천되어야 합니다.");
+        }
+    }
 }

@@ -6,92 +6,177 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ResourceUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
 public class CourseDataService {
+    private static final Logger logger = LoggerFactory.getLogger(CourseDataService.class);
     private List<DetailedCourseInfo> allDetailedCourses = new ArrayList<>();
-    final Map<String, CourseInfo> courseCatalogForSearch = new ConcurrentHashMap<>();
+    private Map<String, CourseInfo> courseCatalogForSearch = new ConcurrentHashMap<>();
 
-    private static final List<String> RESTRICTED_COURSE_DEPARTMENTS = List.of("군사학", "신입생세미나", "교직");
+    private static final List<String> RESTRICTED_COURSE_KEYWORDS =
+            List.of("군사학", "신입생세미나", "교직", "rc영어", "college english", "공학영어", "자연과학영어");
 
     @PostConstruct
     public void loadAndProcessCourseData() {
         ObjectMapper objectMapper = new ObjectMapper();
-        // 만약을 위해 FAIL_ON_UNKNOWN_PROPERTIES를 false로 설정 (클래스 레벨의 @JsonIgnoreProperties와 중복될 수 있으나, 더 확실하게)
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
         try {
-            File file = ResourceUtils.getFile("classpath:data/everytime_courses.json");
-            // DetailedCourseInfo 클래스에 @JsonProperty로 모든 필드가 잘 매핑되어 있다면 직접 변환
+            File file = ResourceUtils.getFile("classpath:data/everytime_final.json");
             List<DetailedCourseInfo> loadedCourses = objectMapper.readValue(file, new TypeReference<List<DetailedCourseInfo>>() {});
 
-            allDetailedCourses = loadedCourses.stream()
-                    .filter(c -> c.getCourseCode() != null && !c.getCourseCode().isBlank() && c.getCourseName() != null)
-                    .peek(course -> {
-                        course.setGeneralizedType(mapDepartmentToGeneralizedType(course.getDepartmentOriginal()));
-                        course.setRestrictedCourse(RESTRICTED_COURSE_DEPARTMENTS.contains(course.getDepartmentOriginal()));
+            this.allDetailedCourses = loadedCourses.stream()
+                    .filter(c -> c != null && c.getCourseCode() != null && !c.getCourseCode().isBlank() && c.getCourseName() != null && !c.getCourseName().isBlank())
+                    .map(course -> {
+                        // DetailedCourseInfo 객체 필드 설정 (Lombok @Builder 또는 생성자 사용 권장)
+                        DetailedCourseInfo processedCourse = new DetailedCourseInfo();
+                        processedCourse.setCourseCode(course.getCourseCode());
+                        processedCourse.setCourseName(course.getCourseName());
+                        processedCourse.setDepartmentOriginal(course.getDepartmentOriginal());
+                        processedCourse.setSpecificMajor(course.getSpecificMajor()); // "세부전공" 필드
+                        processedCourse.setCredits(course.getCredits());
+                        processedCourse.setTotalHours(course.getTotalHours()); // JSON에 "시간" 필드가 있다면
+
+                        // groupId 설정
+                        if (course.getCourseCode().length() >= 7) {
+                            processedCourse.setGroupId(course.getCourseCode().substring(0, 7));
+                        } else {
+                            processedCourse.setGroupId(course.getCourseCode());
+                        }
+
+                        // 1차 일반화된 타입 설정
+                        processedCourse.setGeneralizedType(determineInitialGeneralizedType(course.getDepartmentOriginal()));
+
+                        // 추천 제한 과목 여부 설정
+                        String generalizedType = processedCourse.getGeneralizedType();
+                        processedCourse.setRestrictedCourse(
+                                !(Objects.equals(generalizedType, "교양") || Objects.equals(generalizedType, "전공_후보"))
+                        );
+                        // 또는 RESTRICTED_COURSE_KEYWORDS 사용 로직 (현재는 위 규칙이 우선)
+                        // String deptOriginalLower = course.getDepartmentOriginal() != null ? course.getDepartmentOriginal().toLowerCase() : "";
+                        // if (RESTRICTED_COURSE_KEYWORDS.stream().anyMatch(keyword -> deptOriginalLower.contains(keyword.toLowerCase()))) {
+                        //    processedCourse.setRestrictedCourse(true);
+                        // }
+
+
+                        // 나머지 필드 null 처리 등
                         if (course.getScheduleSlots() == null) {
-                            course.setScheduleSlots(Collections.emptyList());
+                            processedCourse.setScheduleSlots(Collections.emptyList());
+                        } else {
+                            processedCourse.setScheduleSlots(course.getScheduleSlots());
                         }
-                        // 학년 필드가 null일 경우 기본값 설정
-                        if (course.getGrade() == null) {
-                            course.setGrade("정보없음");
+                        String grade = course.getGrade();
+                        if (grade == null || grade.trim().isEmpty() || grade.equalsIgnoreCase("null")) {
+                            processedCourse.setGrade("정보없음");
+                        } else {
+                            processedCourse.setGrade(grade.trim());
                         }
-                        // "시간" 필드 (totalHours)는 DetailedCourseInfo에 int로 선언했고 @JsonProperty("시간")으로 매핑했으므로
-                        // Jackson이 JSON의 숫자 값을 int로 자동 변환 시도합니다.
-                        // 만약 JSON의 "시간" 값이 문자열이라면, DetailedCourseInfo의 totalHours를 String으로 변경 후 여기서 parseInt하거나,
-                        // 커스텀 Deserializer를 사용해야 합니다. 현재는 JSON에 숫자가 있다고 가정합니다.
+                        processedCourse.setProfessor(course.getProfessor());
+                        processedCourse.setClassroom(course.getClassroom());
+                        processedCourse.setRemarks(course.getRemarks());
+
+                        return processedCourse;
                     })
                     .collect(Collectors.toList());
 
-            // 검색용 카탈로그 생성 (CourseInfo는 totalHours 필드가 없으므로, 필요시 추가)
-            allDetailedCourses.forEach(dc -> {
+            Map<String, CourseInfo> tempCatalog = new ConcurrentHashMap<>();
+            this.allDetailedCourses.forEach(dc -> {
                 CourseInfo ci = new CourseInfo(dc.getCourseCode(), dc.getCourseName(), dc.getDepartmentOriginal(), dc.getCredits(), dc.getGrade());
-                courseCatalogForSearch.putIfAbsent(dc.getCourseCode(), ci);
+                tempCatalog.putIfAbsent(dc.getCourseCode(), ci);
             });
+            this.courseCatalogForSearch.clear();
+            this.courseCatalogForSearch.putAll(tempCatalog);
 
-            System.out.println(allDetailedCourses.size() + "개의 상세 강의 정보 로드 및 처리 완료 (CourseDataService).");
+            logger.info("{}개의 상세 강의 정보 로드 및 처리 완료 (CourseDataService).", this.allDetailedCourses.size());
 
         } catch (IOException e) {
-            System.err.println("강의 데이터(everytime_courses.json) 로드/파싱 실패: " + e.getMessage());
-            e.printStackTrace();
-            allDetailedCourses = new ArrayList<>();
+            logger.error("강의 데이터(everytime_final.json) 로드/파싱 실패: {}", e.getMessage(), e);
+            this.allDetailedCourses = new ArrayList<>();
+            this.courseCatalogForSearch.clear();
         }
     }
 
-    public String mapDepartmentToGeneralizedType(String departmentOriginal) {
-        if (departmentOriginal == null) return "기타";
-        if (departmentOriginal.contains("전공")) {
-            if (departmentOriginal.contains("이중") || departmentOriginal.contains("부전공")) return "이중전공";
-            return "전공";
+    /**
+     * "개설영역" 문자열을 기반으로 과목의 1차적인 일반화된 유형을 결정합니다.
+     * 학생의 새로운 규칙: "교양", "전공"이 아닌 개설영역은 원본값을 generalizedType으로 사용하거나 특정 카테고리로 분류.
+     */
+    public String determineInitialGeneralizedType(String departmentOriginal) {
+        if (departmentOriginal == null || departmentOriginal.trim().isEmpty()) {
+            return "기타";
         }
-        if (departmentOriginal.contains("교양")) return "교양";
-        if (RESTRICTED_COURSE_DEPARTMENTS.contains(departmentOriginal)) return departmentOriginal;
+        String deptLower = departmentOriginal.toLowerCase().trim();
+
+        // 학생의 규칙: "개설영역"이 '교양' 또는 '전공'이 아닌 데이터는 모두 '특정 사용자 대상 과목'
+        // 여기서 '특정 사용자 대상 과목'을 어떻게 generalizedType으로 표현할지 결정 필요
+        // 1. "교양"으로 명확히 분류
+        if (deptLower.equals("교양") || deptLower.equals("대학외국어") ||
+                deptLower.contains("생활과스포츠") || deptLower.contains("실용외국어(선택)") ||
+                deptLower.contains("미래시뮬레이션") || deptLower.contains("hufs career") ||
+                deptLower.contains("인성교육") || deptLower.contains("인간과사회") ||
+                deptLower.contains("과학과기술") || deptLower.contains("역사와철학") ||
+                deptLower.contains("문화와예술") || deptLower.equals("미네르바인문") ||
+                deptLower.equals("소프트웨어기초") || deptLower.equals("언어와문학")) {
+            return "교양";
+        }
+
+        // 2. "전공"으로 명확히 분류 (TimetableService에서 사용자 전공과 비교하여 최종 결정될 "후보")
+        if (deptLower.equals("전공")) {
+            return "전공_후보";
+        }
+
+        // 3. 그 외 (학생 규칙에 따라 '특정 사용자 대상 과목'으로 간주될 수 있는 것들)
+        //    RESTRICTED_COURSE_KEYWORDS를 사용하여 명시적으로 분류
+        for (String restrictedKeyword : RESTRICTED_COURSE_KEYWORDS) {
+            if (deptLower.contains(restrictedKeyword.toLowerCase())) {
+                // 각 키워드에 맞는 구체적인 타입 반환 (예: "군사학", "교직")
+                if (restrictedKeyword.equalsIgnoreCase("군사학")) return "군사학";
+                if (restrictedKeyword.equalsIgnoreCase("신입생세미나")) return "신입생세미나";
+                if (restrictedKeyword.equalsIgnoreCase("교직")) return "교직";
+                if (restrictedKeyword.equalsIgnoreCase("rc영어")) return "RC영어";
+                if (restrictedKeyword.equalsIgnoreCase("college english")) return "COLLEGE ENGLISH";
+                if (restrictedKeyword.equalsIgnoreCase("공학영어·자연과학영어")) return "공학영어·자연과학영어";
+                if (restrictedKeyword.equalsIgnoreCase("공학영어")) return "공학영어";
+                if (restrictedKeyword.equalsIgnoreCase("자연과학영어")) return "자연과학영어";
+                return departmentOriginal; // 명확한 매핑 없으면 원본값 또는 더 일반적인 "특수과목"
+            }
+        }
+
+        // "학부", "학과" 등을 포함하지만 위에서 "전공"으로 명시되지 않은 경우 -> "전공_후보"
+        // (TimetableService에서 "세부전공"과 비교하여 최종 결정)
+        if (deptLower.contains("학부") || deptLower.contains("학과") || deptLower.contains("전공")) {
+            // (이미 deptLower.equals("전공")은 위에서 "전공_후보"로 처리됨)
+            // deptLower.contains("전공")은 "이중전공", "기타전공" 등도 포함할 수 있으므로 주의
+            return "전공_후보";
+        }
+
+        // 위 규칙에 해당하지 않는 모든 것은 "기타" 또는 더 구체적인 "특수과목_미분류" 등으로 처리
         return "기타";
     }
 
+    // (getDetailedCourses, getCourseInfoByCode, getDetailedCourseByCode, searchCourses 메소드는 이전 답변과 동일하게 유지)
     public List<DetailedCourseInfo> getDetailedCourses() {
         return Collections.unmodifiableList(allDetailedCourses);
     }
 
     public CourseInfo getCourseInfoByCode(String courseCode) {
+        if (courseCode == null) return null;
         return courseCatalogForSearch.get(courseCode);
     }
 
     public DetailedCourseInfo getDetailedCourseByCode(String courseCode) {
+        if (courseCode == null) return null;
         return allDetailedCourses.stream()
-                .filter(c -> c.getCourseCode().equals(courseCode))
+                .filter(c -> Objects.equals(courseCode, c.getCourseCode()))
                 .findFirst().orElse(null);
     }
 
@@ -102,11 +187,26 @@ public class CourseDataService {
 
         return courseCatalogForSearch.values().stream()
                 .filter(course -> {
+                    if (course == null) return false;
+
                     boolean nameMatch = lowerCaseQuery == null ||
                             (course.getCourseName() != null && course.getCourseName().toLowerCase().contains(lowerCaseQuery)) ||
                             (course.getCourseCode() != null && course.getCourseCode().toLowerCase().contains(lowerCaseQuery));
-                    boolean deptMatch = deptFilter == null || (course.getDepartment() != null && course.getDepartment().equals(deptFilter));
-                    boolean gradeMatch = gradeFilter == null || (course.getGrade() != null && (course.getGrade().contains(gradeFilter) || "전학년".equals(course.getGrade()) || course.getGrade().contains(gradeFilter.replaceAll("[^0-9]", ""))));
+
+                    boolean deptMatch = deptFilter == null ||
+                            (course.getDepartment() != null && course.getDepartment().equals(deptFilter));
+
+                    boolean gradeMatch = true;
+                    if (gradeFilter != null) {
+                        String courseGrade = course.getGrade();
+                        if (gradeFilter.equalsIgnoreCase("정보없음")) {
+                            gradeMatch = (courseGrade == null || courseGrade.equals("정보없음") || courseGrade.trim().isEmpty());
+                        } else if (courseGrade == null || courseGrade.equals("정보없음") || courseGrade.trim().isEmpty()) {
+                            gradeMatch = false;
+                        } else {
+                            gradeMatch = courseGrade.contains(gradeFilter.replaceAll("[^0-9]", ""));
+                        }
+                    }
                     return nameMatch && deptMatch && gradeMatch;
                 })
                 .collect(Collectors.toList());
