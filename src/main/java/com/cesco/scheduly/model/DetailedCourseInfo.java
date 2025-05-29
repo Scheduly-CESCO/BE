@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true) // 알려지지 않은 다른 필드는 계속 무시하도록 유지
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class DetailedCourseInfo {
 
     @JsonProperty("학수번호")
@@ -22,15 +22,20 @@ public class DetailedCourseInfo {
     private String courseName;
 
     @JsonProperty("개설영역")
-    private String departmentOriginal;
+    private String departmentOriginal; // 원본 "개설영역"
 
-    private String generalizedType; // 예: "전공", "교양" (서비스 로직에서 채움)
+    @JsonProperty("세부전공") // 새로운 필드
+    private String specificMajor;    // "세부전공" 컬럼 값
+
+    private String groupId; // 학수번호 앞 7자리 (동일과목 판단용) - 서비스 로직에서 채움
+
+    private String generalizedType; // 1차 분류된 과목 유형 (예: "교양", "전공_후보", "군사학") - 서비스 로직에서 채움
 
     @JsonProperty("학점")
     private int credits;
 
-    @JsonProperty("시간") // JSON의 "시간" 필드 추가
-    private int totalHours;   // 주당 총 수업 시간 (정수형으로 가정, 필요시 String으로 변경 후 파싱)
+    @JsonProperty("시간")
+    private int totalHours;
 
     @JsonProperty("학년")
     private String grade;
@@ -47,5 +52,5 @@ public class DetailedCourseInfo {
     @JsonProperty("시간표정보")
     private List<TimeSlotDto> scheduleSlots;
 
-    private boolean isRestrictedCourse; // 추천 제한 여부 (서비스 로직에서 채움)
+    private boolean isRestrictedCourse; // 추천 제한 여부 - 서비스 로직에서 채움
 }
