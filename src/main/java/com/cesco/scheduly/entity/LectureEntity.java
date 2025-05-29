@@ -26,5 +26,9 @@ public class LectureEntity {
     private String department;
 
     @Column(name = "세부전공")
-    private String subject;
+    private String specialization;
+
+    // 필요시 추가 필드 예:
+    // @Column(name = "학점")
+    // private int credit;
 }
