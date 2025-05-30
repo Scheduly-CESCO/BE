@@ -1,9 +1,9 @@
 package com.cesco.scheduly.controller;
 
 import com.cesco.scheduly.dto.course.CourseInfo;
-import com.cesco.scheduly.dto.course.CourseListRequest;
-import com.cesco.scheduly.dto.user.UserRegistrationRequest;
-import com.cesco.scheduly.entity.UserEntity;
+import com.cesco.scheduly.dto.course.PreferencesRequest;
+import com.cesco.scheduly.dto.user.SignupRequest;
+import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.exception.InvalidInputException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.service.CourseDataService;
@@ -50,10 +50,10 @@ public class UserControllerTest {
     @MockBean
     private CourseDataService courseDataService;
 
-    private UserRegistrationRequest userRegistrationRequest;
-    private UserEntity sampleRegisteredUser;
+    private SignupRequest signupRequest;
+    private User sampleRegisteredUser;
     private String testUserId;
-    private CourseListRequest courseListRequest;
+    private PreferencesRequest preferencesRequest;
 
     // 실제 학수번호 형식 예시
     private String courseCodeSample1 = "M01207101";
@@ -62,14 +62,14 @@ public class UserControllerTest {
 
     @BeforeEach
     void setUp() {
-        userRegistrationRequest = new UserRegistrationRequest();
-        userRegistrationRequest.setUsername("newUser");
-        userRegistrationRequest.setPassword("password");
-        userRegistrationRequest.setGrade("1");
-        userRegistrationRequest.setMajor("Computer Science");
-        userRegistrationRequest.setDoubleMajor(null);
+        signupRequest = new SignupRequest();
+        signupRequest.setUsername("newUser");
+        signupRequest.setPassword("password");
+        signupRequest.setGrade("1");
+        signupRequest.setMajor("Computer Science");
+        signupRequest.setDoubleMajor(null);
 
-        sampleRegisteredUser = UserEntity.builder()
+        sampleRegisteredUser = User.builder()
                 .userId("new-uuid-123")
                 .username("newUser")
                 .passwordHash("hashedPassword")
@@ -78,19 +78,19 @@ public class UserControllerTest {
                 .build();
 
         testUserId = "user123";
-        courseListRequest = new CourseListRequest();
-        courseListRequest.setCourseCodes(List.of(courseCodeSample1, courseCodeSample2));
+        preferencesRequest = new PreferencesRequest();
+        preferencesRequest.setCourseCodes(List.of(courseCodeSample1, courseCodeSample2));
     }
 
     @Test
     @DisplayName("사용자 회원가입 API 테스트 - 성공")
     void registerUser_Success() throws Exception {
-        when(userService.registerUser(any(UserRegistrationRequest.class))).thenReturn(sampleRegisteredUser);
+        when(userService.registerUser(any(SignupRequest.class))).thenReturn(sampleRegisteredUser);
 
         mockMvc.perform(post("/api/users/register")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(userRegistrationRequest)))
+                        .content(objectMapper.writeValueAsString(signupRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userId", is(sampleRegisteredUser.getUserId())))
                 .andExpect(jsonPath("$.message", is("사용자 등록에 성공했습니다.")));
@@ -99,15 +99,15 @@ public class UserControllerTest {
     @Test
     @DisplayName("사용자 회원가입 API 테스트 - 실패 (사용자명 중복)")
     void registerUser_Fail_UsernameConflict() throws Exception {
-        String existingUsername = userRegistrationRequest.getUsername();
+        String existingUsername = signupRequest.getUsername();
         String errorMessage = "이미 사용 중인 사용자명입니다: " + existingUsername;
-        when(userService.registerUser(any(UserRegistrationRequest.class)))
+        when(userService.registerUser(any(SignupRequest.class)))
                 .thenThrow(new InvalidInputException(errorMessage));
 
         mockMvc.perform(post("/api/users/register")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(userRegistrationRequest)))
+                        .content(objectMapper.writeValueAsString(signupRequest)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message", is(errorMessage)));
     }
@@ -121,7 +121,7 @@ public class UserControllerTest {
         mockMvc.perform(put("/api/users/{userId}/history/taken-courses", testUserId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(courseListRequest)))
+                        .content(objectMapper.writeValueAsString(preferencesRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message", is("수강 이력 업데이트 성공")));
     }
@@ -139,7 +139,7 @@ public class UserControllerTest {
         mockMvc.perform(put("/api/users/{userId}/history/taken-courses", nonExistentUserId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(courseListRequest)))
+                        .content(objectMapper.writeValueAsString(preferencesRequest)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message", is(errorMessage)));
     }
@@ -173,7 +173,7 @@ public class UserControllerTest {
         mockMvc.perform(put("/api/users/{userId}/semester/mandatory-courses", testUserId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(courseListRequest)))
+                        .content(objectMapper.writeValueAsString(preferencesRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message", is("필수 과목 업데이트 성공")));
     }
@@ -187,7 +187,7 @@ public class UserControllerTest {
         mockMvc.perform(put("/api/users/{userId}/semester/retake-courses", testUserId)
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(courseListRequest)))
+                        .content(objectMapper.writeValueAsString(preferencesRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message", is("재수강 과목 업데이트 성공")));
     }

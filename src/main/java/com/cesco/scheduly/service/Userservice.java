@@ -1,9 +1,9 @@
 package com.cesco.scheduly.service;
 
-import com.cesco.scheduly.dto.user.SignupRequest;
-import com.cesco.scheduly.dto.user.UserRegistrationRequest;
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
+import com.cesco.scheduly.dto.user.SignupRequest;
+import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.exception.InvalidInputException;
@@ -11,7 +11,7 @@ import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.repository.UserCourseSelectionRepository;
 import com.cesco.scheduly.repository.UserPreferenceRepository;
 import com.cesco.scheduly.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired; // 생성자 주입을 위해 추가
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,12 +45,12 @@ public class Userservice {
     }
 
     @Transactional
-    public UserEntity signup(SignupRequest dto) {
+    public User signup(SignupRequest dto) {
         if (userRepository.existsByStudentId(dto.getStudentId())) {
             throw new InvalidInputException("이미 등록된 학번입니다.");
         }
 
-        UserEntity user = new UserEntity();
+        User user = new User();
         user.setStudentId(dto.getStudentId());
         user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
         user.setName(dto.getName());
@@ -60,8 +60,8 @@ public class Userservice {
     }
 
     @Transactional
-    public UserEntity authenticate(String studentId, String password) {
-        UserEntity user = userRepository.findByStudentId(studentId)
+    public User authenticate(String studentId, String password) {
+        User user = userRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 학번입니다."));
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
@@ -70,18 +70,18 @@ public class Userservice {
         return user;
     }
 
-    public UserEntity registerUser(UserRegistrationRequest request) {
+    public User registerUser(SignupRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new InvalidInputException("이미 사용 중인 사용자명입니다: " + request.getUsername());
         }
-        UserEntity newUser = UserEntity.builder()
+        User newUser = User.builder()
                 .username(request.getUsername())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .grade(request.getGrade())
                 .major(request.getMajor())
                 .doubleMajor(request.getDoubleMajor())
                 .build();
-        UserEntity savedUser = userRepository.save(newUser);
+        User savedUser = userRepository.save(newUser);
 
         // 사용자에 대한 과목 선택 정보 엔티티 생성 및 저장
         UserCourseSelectionEntity selection = UserCourseSelectionEntity.builder()
@@ -107,7 +107,7 @@ public class Userservice {
     }
 
     @Transactional(readOnly = true)
-    public UserEntity findUserById(String userId) {
+    public User findUserById(String userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("사용자를 찾을 수 없습니다. ID: " + userId));
     }
@@ -234,7 +234,7 @@ public class Userservice {
     }
 
     @Transactional(readOnly = true)
-    public UserEntity getUserDetails(String userId) {
+    public User getUserDetails(String userId) {
         return findUserById(userId);
     }
 }

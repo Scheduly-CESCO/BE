@@ -2,7 +2,7 @@ package com.cesco.scheduly.service;
 
 import com.cesco.scheduly.dto.timetable.*;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
-import com.cesco.scheduly.entity.UserEntity;
+import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.model.DetailedCourseInfo;
 import org.slf4j.Logger;
@@ -17,7 +17,7 @@ public class TimetableService {
 
     private static final Logger logger = LoggerFactory.getLogger(TimetableService.class);
 
-    private final UserService userService;
+    private final Userservice userService;
 
     private final CourseDataService courseDataService;
 
@@ -27,7 +27,7 @@ public class TimetableService {
     }
 
     // 사용자별로 과목의 실제 유형("전공", "이중전공", "교양", "자선" 등)을 최종 판단
-    private String getActualCourseTypeForUser(DetailedCourseInfo course, UserEntity currentUser, CreditSettingsRequest creditSettings) {
+    private String getActualCourseTypeForUser(DetailedCourseInfo course, User currentUser, CreditSettingsRequest creditSettings) {
         if (course == null || currentUser == null) {
             logger.warn("getActualCourseTypeForUser 호출 시 course 또는 currentUser가 null입니다.");
             return "기타";
@@ -98,7 +98,7 @@ public class TimetableService {
     private List<DetailedCourseInfo> prepareCandidateCourses(List<DetailedCourseInfo> allCourses,
                                                              UserCourseSelectionEntity selections,
                                                              String userGrade, // 사용자 학년 (예: "1", "2")
-                                                             UserEntity currentUser,
+                                                             User currentUser,
                                                              CreditSettingsRequest creditSettings) {
         Set<String> takenCourseGroupIds = new HashSet<>();
         Set<String> retakeCourseGroupIds = new HashSet<>();
@@ -141,7 +141,7 @@ public class TimetableService {
 
     private List<DetailedCourseInfo> getAndValidateMandatoryCourses(List<DetailedCourseInfo> candidatePool,
                                                                     UserCourseSelectionEntity selections,
-                                                                    UserEntity currentUser,
+                                                                    User currentUser,
                                                                     CreditSettingsRequest creditSettings) {
         Set<String> mandatoryAndRetakeCodesFromSelection = new HashSet<>();
         if (selections.getMandatoryCourses() != null) mandatoryAndRetakeCodesFromSelection.addAll(selections.getMandatoryCourses());
@@ -171,7 +171,7 @@ public class TimetableService {
 
     public List<RecommendedTimetableDto> generateRecommendations(String userId) {
         logger.info("User ID {} 시간표 추천 생성 시작", userId);
-        UserEntity currentUser = userService.getUserDetails(userId);
+        User currentUser = userService.getUserDetails(userId);
         UserCourseSelectionEntity userSelections = userService.getUserCourseSelection(userId);
         UserPreferenceEntity userPreferences = userService.getUserPreference(userId);
 
@@ -241,7 +241,7 @@ public class TimetableService {
     }
 
     // 시간 선호도에 따라 강의 목록 필터링 및 정렬 (학년 우선순위 적용)
-    private List<DetailedCourseInfo> filterAndSortByTimePreferences(List<DetailedCourseInfo> courses, TimePreferenceRequest preferences, UserEntity currentUser) {
+    private List<DetailedCourseInfo> filterAndSortByTimePreferences(List<DetailedCourseInfo> courses, TimePreferenceRequest preferences, User currentUser) {
         if (preferences == null && currentUser == null) return new ArrayList<>(courses); // 둘 다 없으면 원본 복사
 
         List<DetailedCourseInfo> filteredCourses = courses.stream()
@@ -298,7 +298,7 @@ public class TimetableService {
             TimePreferenceRequest timePreferences,
             CreditSettingsRequest creditSettings,
             int numRecommendationsNeeded,
-            UserEntity currentUser,
+            User currentUser,
             List<String> targetCourseTypes) { // 사용자가 학점 목표를 설정한 유형들
 
         List<List<DetailedCourseInfo>> validTimetables = new ArrayList<>();
@@ -352,7 +352,7 @@ public class TimetableService {
             TimePreferenceRequest timePreferences,
             CreditSettingsRequest creditSettings,
             int numRecommendationsNeeded,
-            UserEntity currentUser,
+            User currentUser,
             List<String> targetCourseTypes) {
 
         if (validTimetables.size() >= numRecommendationsNeeded) {
@@ -524,7 +524,7 @@ public class TimetableService {
                                                   Map<String, Integer> currentCreditsByType,
                                                   int currentTotalCredits,
                                                   CreditSettingsRequest creditSettings,
-                                                  UserEntity currentUser,
+                                                  User currentUser,
                                                   List<String> targetCourseTypes) {
 
         String actualCourseType = getActualCourseTypeForUser(courseToAdd, currentUser, creditSettings);
@@ -557,7 +557,7 @@ public class TimetableService {
         return true;
     }
 
-    private boolean meetsAllCreditCriteriaForUser(List<DetailedCourseInfo> timetable, UserEntity currentUser, CreditSettingsRequest creditSettings, List<String> targetCourseTypes) {
+    private boolean meetsAllCreditCriteriaForUser(List<DetailedCourseInfo> timetable, User currentUser, CreditSettingsRequest creditSettings, List<String> targetCourseTypes) {
         if (timetable.isEmpty()) {
             // 최소 총 학점 조건이 0이 아니거나, 설정되어 있지 않으면 빈 시간표는 조건 만족 안 함
             return !(creditSettings.getMinTotalCredits() != null && creditSettings.getMinTotalCredits() > 0);
@@ -606,7 +606,7 @@ public class TimetableService {
         return true;
     }
 
-    private Map<String, Integer> calculateCreditsByTypeForUser(List<DetailedCourseInfo> courses, UserEntity currentUser, CreditSettingsRequest creditSettings, List<String> targetCourseTypes) {
+    private Map<String, Integer> calculateCreditsByTypeForUser(List<DetailedCourseInfo> courses, User currentUser, CreditSettingsRequest creditSettings, List<String> targetCourseTypes) {
         Map<String, Integer> creditsMap = new HashMap<>();
         List<String> typesToInitializeInMap = new ArrayList<>();
 
@@ -641,7 +641,7 @@ public class TimetableService {
         return creditsMap;
     }
 
-    private RecommendedTimetableDto convertToRecommendedDtoForUser(int id, List<DetailedCourseInfo> courses, Map<String, Integer> creditsByType, int totalCredits, UserEntity currentUser, CreditSettingsRequest creditSettings) {
+    private RecommendedTimetableDto convertToRecommendedDtoForUser(int id, List<DetailedCourseInfo> courses, Map<String, Integer> creditsByType, int totalCredits, User currentUser, CreditSettingsRequest creditSettings) {
         List<ScheduledCourseDto> scheduledCourses = courses.stream()
                 .map(course -> new ScheduledCourseDto(
                         course.getCourseCode(),
