@@ -1,4 +1,4 @@
-package com.cesco.scheduly.dto;
+package com.cesco.scheduly.dto.course;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;

@@ -1,4 +1,4 @@
-package com.cesco.scheduly.dto;
+package com.cesco.scheduly.dto.course;
 import lombok.Getter;
 import lombok.Setter;
 import java.util.List;

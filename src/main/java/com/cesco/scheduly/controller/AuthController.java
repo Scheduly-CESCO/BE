@@ -1,7 +1,9 @@
 package com.cesco.scheduly.controller;
 
-import com.cesco.scheduly.dto.*;
-import com.cesco.scheduly.entity.User;
+import com.cesco.scheduly.dto.user.LoginRequest;
+import com.cesco.scheduly.dto.user.LoginResponse;
+import com.cesco.scheduly.dto.user.SignupRequest;
+import com.cesco.scheduly.dto.user.SignupResponse;
 import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.service.Userservice;
 import com.cesco.scheduly.config.JwtTokenProvider;
