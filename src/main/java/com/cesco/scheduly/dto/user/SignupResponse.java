@@ -1,4 +1,4 @@
-package com.cesco.scheduly.dto;
+package com.cesco.scheduly.dto.user;
 
 import com.cesco.scheduly.entity.UserEntity;
 import com.fasterxml.jackson.annotation.JsonProperty;
