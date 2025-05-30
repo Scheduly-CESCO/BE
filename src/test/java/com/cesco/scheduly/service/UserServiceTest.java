@@ -1,8 +1,8 @@
 package com.cesco.scheduly.service;
 
-import com.cesco.scheduly.dto.user.UserRegistrationRequest;
+import com.cesco.scheduly.dto.user.SignupRequest;
+import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
-import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.exception.InvalidInputException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
@@ -48,8 +48,8 @@ class UserServiceTest {
     @InjectMocks
     private Userservice userService;
 
-    private UserRegistrationRequest registrationRequest;
-    private UserEntity sampleUser;
+    private SignupRequest signupRequest;
+    private User sampleUser;
     private String sampleUserId = "user-uuid-123"; // 실제 UUID 형식으로 변경해도 무방
     // 실제 학수번호 형식으로 변경된 예시
     private String courseCode1 = "M01207101"; // 예시: 머신러닝
@@ -57,13 +57,13 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        registrationRequest = new UserRegistrationRequest();
-        registrationRequest.setUsername("testuser");
-        registrationRequest.setPassword("password123");
-        registrationRequest.setGrade("1");
-        registrationRequest.setMajor("컴퓨터공학부");
+        signupRequest = new SignupRequest();
+        signupRequest.setUsername("testuser");
+        signupRequest.setPassword("password123");
+        signupRequest.setGrade("1");
+        signupRequest.setMajor("컴퓨터공학부");
 
-        sampleUser = UserEntity.builder()
+        sampleUser = User.builder()
                 .Id(Long.valueOf(sampleUserId))
                 .username("testuser")
                 .passwordHash("hashedPassword")
@@ -76,23 +76,23 @@ class UserServiceTest {
     @DisplayName("회원가입 성공 테스트")
     void registerUser_Success() {
         // Arrange
-        when(userRepository.existsByUsername(registrationRequest.getUsername())).thenReturn(false);
-        when(passwordEncoder.encode(registrationRequest.getPassword())).thenReturn("hashedPassword");
-        when(userRepository.save(any(UserEntity.class))).thenReturn(sampleUser);
+        when(userRepository.existsByUsername(signupRequest.getUsername())).thenReturn(false);
+        when(passwordEncoder.encode(signupRequest.getPassword())).thenReturn("hashedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(sampleUser);
         when(userCourseSelectionRepository.save(any(UserCourseSelectionEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(userPreferenceRepository.save(any(UserPreferenceEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        UserEntity registeredUser = userService.registerUser(registrationRequest);
+        User registeredUser = userService.registerUser(signupRequest);
 
         // Assert
         assertNotNull(registeredUser);
-        assertEquals(registrationRequest.getUsername(), registeredUser.getUsername());
+        assertEquals(signupRequest.getUsername(), registeredUser.getUsername());
         assertEquals("hashedPassword", registeredUser.getPasswordHash());
         verify(userRepository, times(1)).existsByUsername(anyString());
-        verify(userRepository, times(1)).save(any(UserEntity.class));
+        verify(userRepository, times(1)).save(any(User.class));
         verify(userCourseSelectionRepository, times(1)).save(any(UserCourseSelectionEntity.class));
         verify(userPreferenceRepository, times(1)).save(any(UserPreferenceEntity.class));
     }
@@ -101,15 +101,15 @@ class UserServiceTest {
     @DisplayName("회원가입 실패 테스트 - 사용자명 중복")
     void registerUser_UsernameAlreadyExists() {
         // Arrange
-        when(userRepository.existsByUsername(registrationRequest.getUsername())).thenReturn(true);
+        when(userRepository.existsByUsername(signupRequest.getUsername())).thenReturn(true);
 
         // Act & Assert
         InvalidInputException exception = assertThrows(InvalidInputException.class, () -> {
-            userService.registerUser(registrationRequest);
+            userService.registerUser(signupRequest);
         });
-        assertEquals("이미 사용 중인 사용자명입니다: " + registrationRequest.getUsername(), exception.getMessage());
+        assertEquals("이미 사용 중인 사용자명입니다: " + signupRequest.getUsername(), exception.getMessage());
         verify(userRepository, times(1)).existsByUsername(anyString());
-        verify(userRepository, never()).save(any(UserEntity.class));
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test

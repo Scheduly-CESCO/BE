@@ -1,14 +1,17 @@
 package com.cesco.scheduly.controller;
 
+import com.cesco.scheduly.config.JwtTokenProvider;
 import com.cesco.scheduly.dto.user.LoginRequest;
 import com.cesco.scheduly.dto.user.LoginResponse;
 import com.cesco.scheduly.dto.user.SignupRequest;
 import com.cesco.scheduly.dto.user.SignupResponse;
-import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.service.Userservice;
-import com.cesco.scheduly.config.JwtTokenProvider;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,14 +27,14 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody SignupRequest dto) {
-        UserEntity user = userService.signup(dto);
+        User user = userService.signup(dto);
         return ResponseEntity.ok(new SignupResponse(user));
     }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest dto) {
-        UserEntity user = userService.authenticate(dto.getStudentId(), dto.getPassword());
-        String token = jwtTokenProvider.createToken(user.getStudentId(), user.getUserId());
+        User user = userService.authenticate(dto.getStudentId(), dto.getPassword());
+        String token = jwtTokenProvider.createToken(user.getStudentId(), user.getId());
         return ResponseEntity.ok(new LoginResponse(token, user.getId(), user.getName()));
     }
 }

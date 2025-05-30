@@ -2,7 +2,7 @@ package com.cesco.scheduly.service;
 
 import com.cesco.scheduly.dto.timetable.*;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
-import com.cesco.scheduly.entity.UserEntity;
+import org.springframework.security.core.userdetails.User;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.model.DetailedCourseInfo;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +37,7 @@ class TimetableServiceTest {
     @InjectMocks
     private TimetableService timetableService;
 
-    private UserEntity sampleUser;
+    private User sampleUser;
     private UserCourseSelectionEntity sampleUserSelections;
     private UserPreferenceEntity sampleUserPreferences;
     private List<DetailedCourseInfo> allSampleCoursesSetup;
@@ -57,7 +57,7 @@ class TimetableServiceTest {
 
     @BeforeEach
     void setUp() {
-        sampleUser = UserEntity.builder()
+        sampleUser = User.builder()
                 .userId("userTest01")
                 .grade("3")
                 .major("Global Business & Technology")

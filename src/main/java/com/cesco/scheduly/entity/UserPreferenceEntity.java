@@ -25,7 +25,7 @@ public class UserPreferenceEntity {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false, unique = true)
-    private UserEntity user;
+    private User user;
 
     @Lob
     @Convert(converter = TimePreferenceRequestConverter.class)

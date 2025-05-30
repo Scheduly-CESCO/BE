@@ -2,11 +2,11 @@ package com.cesco.scheduly.controller;
 
 import com.cesco.scheduly.dto.ApiResponse;
 import com.cesco.scheduly.dto.course.CourseInfo;
-import com.cesco.scheduly.dto.course.CourseListRequest;
 import com.cesco.scheduly.dto.course.CourseSearchResponse;
-import com.cesco.scheduly.dto.user.UserRegistrationRequest;
-import com.cesco.scheduly.dto.user.UserResponse;
-import com.cesco.scheduly.entity.UserEntity;
+import com.cesco.scheduly.dto.course.PreferencesRequest;
+import com.cesco.scheduly.dto.user.SignupRequest;
+import com.cesco.scheduly.dto.user.SignupResponse;
+import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.exception.InvalidInputException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.service.CourseDataService;
@@ -37,11 +37,11 @@ public class UserController {
 
     // 1. 사용자 등록 API
     @PostMapping("/users/register")
-    public ResponseEntity<?> registerUser(@RequestBody UserRegistrationRequest registrationRequest) {
+    public ResponseEntity<?> registerUser(@RequestBody SignupRequest signupRequest) {
         try {
-            UserEntity newUser = userService.registerUser(registrationRequest);
+            User newUser = userService.registerUser(signupRequest);
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new UserResponse(newUser.getUserId(), "사용자 등록에 성공했습니다."));
+                    .body(new SignupResponse(newUser.getUserId(), "사용자 등록에 성공했습니다."));
         } catch (InvalidInputException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiResponse(e.getMessage()));
         } catch (RuntimeException e) {
@@ -55,9 +55,9 @@ public class UserController {
     @PutMapping("/users/{userId}/history/taken-courses")
     public ResponseEntity<ApiResponse> updateTakenCourses(
             @PathVariable String userId,
-            @RequestBody CourseListRequest courseListRequest) {
+            @RequestBody PreferencesRequest preferencesRequest) {
         try {
-            userService.updateTakenCourses(userId, courseListRequest.getCourseCodes());
+            userService.updateTakenCourses(userId, preferenceRequest.getCourseCodes());
             return ResponseEntity.ok(new ApiResponse("수강 이력 업데이트 성공"));
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(e.getMessage()));
@@ -96,9 +96,9 @@ public class UserController {
     @PutMapping("/users/{userId}/semester/mandatory-courses")
     public ResponseEntity<ApiResponse> updateMandatoryCourses(
             @PathVariable String userId,
-            @RequestBody CourseListRequest courseListRequest) {
+            @RequestBody PreferencesRequest preferenceRequest) {
         try {
-            userService.updateMandatoryCourses(userId, courseListRequest.getCourseCodes());
+            userService.updateMandatoryCourses(userId, preferenceRequest.getCourseCodes());
             return ResponseEntity.ok(new ApiResponse("필수 과목 업데이트 성공"));
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(e.getMessage()));
@@ -115,9 +115,9 @@ public class UserController {
     @PutMapping("/users/{userId}/semester/retake-courses")
     public ResponseEntity<ApiResponse> updateRetakeCourses(
             @PathVariable String userId,
-            @RequestBody CourseListRequest courseListRequest) {
+            @RequestBody PreferencesRequest preferenceRequest) {
         try {
-            userService.updateRetakeCourses(userId, courseListRequest.getCourseCodes());
+            userService.updateRetakeCourses(userId, preferenceRequest.getCourseCodes());
             return ResponseEntity.ok(new ApiResponse("재수강 과목 업데이트 성공"));
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse(e.getMessage()));

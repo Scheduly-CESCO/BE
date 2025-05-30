@@ -23,7 +23,7 @@ public class UserCourseSelectionEntity {
 
     @OneToOne(fetch = FetchType.LAZY) // 사용자와 1:1 관계
     @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false, unique = true)
-    private UserEntity user;
+    private User user;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_taken_courses", joinColumns = @JoinColumn(name = "selection_id"))
