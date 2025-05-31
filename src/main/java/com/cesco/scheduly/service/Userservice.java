@@ -4,7 +4,6 @@ import com.cesco.scheduly.dto.SignupRequest;
 import com.cesco.scheduly.dto.user.UserRegistrationRequest;
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
-import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserEntity;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;

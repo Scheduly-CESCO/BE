@@ -17,7 +17,7 @@ public class TimetableService {
 
     private static final Logger logger = LoggerFactory.getLogger(TimetableService.class);
 
-    private final UserService userService;
+    private final Userservice userService;
 
     private final CourseDataService courseDataService;
 
@@ -163,7 +163,7 @@ public class TimetableService {
         List<DetailedCourseInfo> validatedMandatoryCourses = new ArrayList<>(mandatoryCoursesByGroupId.values());
 
         if (hasTimeConflictInList(validatedMandatoryCourses)) {
-            logger.error("User ID {}: 필수/재수강 과목 간 시간 중복 발생: {}", currentUser.getUserId(), validatedMandatoryCourses.stream().map(c -> c.getCourseName() + "(" + c.getCourseCode() + ")").collect(Collectors.joining(", ")));
+            logger.error("User ID {}: 필수/재수강 과목 간 시간 중복 발생: {}", currentUser.getUsername(), validatedMandatoryCourses.stream().map(c -> c.getCourseName() + "(" + c.getCourseCode() + ")").collect(Collectors.joining(", ")));
             return null;
         }
         return validatedMandatoryCourses;

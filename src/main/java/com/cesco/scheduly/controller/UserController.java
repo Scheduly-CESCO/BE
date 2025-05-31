@@ -41,7 +41,7 @@ public class UserController {
         try {
             UserEntity newUser = userService.registerUser(registrationRequest);
             return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new UserResponse(newUser.getId(), "사용자 등록에 성공했습니다."));
+                    .body(new UserResponse(newUser.getUserId(), "사용자 등록에 성공했습니다."));
         } catch (InvalidInputException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiResponse(e.getMessage()));
         } catch (RuntimeException e) {
