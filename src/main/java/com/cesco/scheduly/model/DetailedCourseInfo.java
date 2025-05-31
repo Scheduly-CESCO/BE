@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonIgnoreProperties(ignoreUnknown = true) // JSON에 있지만 클래스에 없는 필드는 무시
 public class DetailedCourseInfo {
 
     @JsonProperty("학수번호")

@@ -1,6 +1,6 @@
 package com.cesco.scheduly.dto.user;
 
-import com.cesco.scheduly.entity.UserEntity;
+import com.cesco.scheduly.entity.User;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import java.time.LocalDateTime;
@@ -16,8 +16,8 @@ public class SignupResponse {
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
 
-    public SignupResponse(UserEntity user) {
-        this.id = user.getUserId();
+    public SignupResponse(User user) {
+        this.id = user.getId();
         this.studentId = user.getStudentId();
         this.name = user.getName();
         this.createdAt = user.getCreatedAt();

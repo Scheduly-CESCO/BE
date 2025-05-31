@@ -2,8 +2,8 @@ package com.cesco.scheduly.entity;
 
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
-import com.cesco.scheduly.util.CreditSettingsRequestConverter; // 이전 파트 1에서 정의
-import com.cesco.scheduly.util.TimePreferenceRequestConverter;   // 이전 파트 1에서 정의
+import com.cesco.scheduly.util.CreditSettingsRequestConverter;
+import com.cesco.scheduly.util.TimePreferenceRequestConverter;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,18 +19,18 @@ import lombok.NoArgsConstructor;
 public class UserPreferenceEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue(strategy = GenerationType.UUID) // 또는 GenerationType.IDENTITY
     @Column(name = "preference_id")
-    private String preferenceId;
+    private String preferenceId; // UUID 또는 Long 타입 고려
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false, unique = true)
-    private User user;
+    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false, unique = true) // User 엔티티의 PK 'id' 참조
+    private User user; // UserEntity 대신 User 사용
 
     @Lob
     @Convert(converter = TimePreferenceRequestConverter.class)
     @Column(name = "time_preferences_json", columnDefinition = "TEXT")
-    @Builder.Default // 빌더 사용 시 기본값 설정
+    @Builder.Default
     private TimePreferenceRequest timePreferences = new TimePreferenceRequest();
 
     @Lob

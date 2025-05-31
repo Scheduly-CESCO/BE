@@ -180,6 +180,7 @@ public class CourseDataService {
                 .findFirst().orElse(null);
     }
 
+    //과목 검색
     public List<CourseInfo> searchCourses(String query, String department, String grade) {
         String lowerCaseQuery = (query != null && !query.isBlank()) ? query.toLowerCase().trim() : null;
         String deptFilter = (department != null && !department.isBlank()) ? department.trim() : null;

@@ -21,14 +21,14 @@ public class UserCourseSelectionEntity {
     @Column(name = "selection_id")
     private String selectionId;
 
-    @OneToOne(fetch = FetchType.LAZY) // 사용자와 1:1 관계
-    @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false, unique = true)
-    private User user;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false, unique = true) // User 엔티티의 PK 'id'(Long) 참조
+    private User user; // 팀원 User 엔티티 사용
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_taken_courses", joinColumns = @JoinColumn(name = "selection_id"))
     @Column(name = "course_code")
-    @Builder.Default // 빌더 사용 시 기본값 설정
+    @Builder.Default
     private List<String> takenCourses = new ArrayList<>();
 
     @ElementCollection(fetch = FetchType.EAGER)

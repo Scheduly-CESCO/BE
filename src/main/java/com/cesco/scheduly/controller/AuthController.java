@@ -5,9 +5,10 @@ import com.cesco.scheduly.dto.user.LoginRequest;
 import com.cesco.scheduly.dto.user.LoginResponse;
 import com.cesco.scheduly.dto.user.SignupRequest;
 import com.cesco.scheduly.dto.user.SignupResponse;
-import com.cesco.scheduly.service.Userservice;
+import com.cesco.scheduly.service.UserService;
+import com.cesco.scheduly.entity.User; // 정확한 User 엔티티 import
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,10 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final Userservice userService;
+    private final UserService userService;
     private final JwtTokenProvider jwtTokenProvider;
 
-    public AuthController(Userservice userService, JwtTokenProvider jwtTokenProvider) {
+    public AuthController(UserService userService, JwtTokenProvider jwtTokenProvider) {
         this.userService = userService;
         this.jwtTokenProvider = jwtTokenProvider;
     }
