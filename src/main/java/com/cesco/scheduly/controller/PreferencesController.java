@@ -1,22 +1,77 @@
 package com.cesco.scheduly.controller;
 
-import com.cesco.scheduly.dto.course.PreferencesRequest;
+import com.cesco.scheduly.service.UserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/preferences")
+@RequiredArgsConstructor
 public class PreferencesController {
 
-  @PostMapping
-  public ResponseEntity<?> savePreferences(@RequestBody PreferencesRequest dto) {
-    // TODO:
-    System.out.println("수강한 과목: " + dto.getCompleted_lectures());
-    System.out.println("필수 과목: " + dto.getRequired_lectures());
-    System.out.println("재수강 과목: " + dto.getRetake_lectures());
+  private final UserService userService;
 
-    return ResponseEntity.ok(Map.of("status", "saved"));
+  // 기수강 과목 추가
+  @PostMapping("/completed")
+  public ResponseEntity<?> addCompletedLectures(
+          @RequestParam String userId,
+          @RequestBody List<String> completedLectures
+  ) {
+    userService.updateTakenCourses(userId, completedLectures);
+    return ResponseEntity.ok(Map.of("status", "completed_saved"));
+  }
+
+  // 기수강 과목 삭제
+  @DeleteMapping("/completed")
+  public ResponseEntity<?> removeCompletedLectures(
+          @RequestParam Long userId,
+          @RequestBody List<Long> lecturesToRemove
+  ) {
+    userService.removeTakenCourses(userId, lecturesToRemove);
+    return ResponseEntity.ok(Map.of("status", "completed_removed"));
+  }
+
+  // ✅ 필수 과목 추가
+  @PostMapping("/required")
+  public ResponseEntity<?> addRequiredLectures(
+          @RequestParam String userId,
+          @RequestBody List<String> requiredLectures
+  ) {
+    userService.updateMandatoryCourses(userId, requiredLectures);
+    return ResponseEntity.ok(Map.of("status", "required_saved"));
+  }
+
+  // ✅ 필수 과목 삭제
+  @DeleteMapping("/required")
+  public ResponseEntity<?> removeRequiredLectures(
+          @RequestParam Long userId,
+          @RequestBody List<Long> lecturesToRemove
+  ) {
+    userService.removeMandatoryCourses(userId, lecturesToRemove);
+    return ResponseEntity.ok(Map.of("status", "required_removed"));
+  }
+
+  // 재수강 과목 추가
+  @PostMapping("/retake")
+  public ResponseEntity<?> addRetakeLectures(
+          @RequestParam String userId,
+          @RequestBody List<String> retakeLectures
+  ) {
+    userService.updateRetakeCourses(userId, retakeLectures);
+    return ResponseEntity.ok(Map.of("status", "retake_saved"));
+  }
+
+  // 재수강 과목 삭제
+  @DeleteMapping("/retake")
+  public ResponseEntity<?> removeRetakeLectures(
+          @RequestParam Long userId,
+          @RequestBody List<Long> lecturesToRemove
+  ) {
+    userService.removeRetakeCourses(userId, lecturesToRemove);
+    return ResponseEntity.ok(Map.of("status", "retake_removed"));
   }
 }

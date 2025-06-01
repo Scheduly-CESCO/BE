@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -191,5 +192,59 @@ public class UserService {
         UserPreferenceEntity userPref = getUserPreference(userId);
         CreditSettingsRequest settings = userPref.getCreditSettings();
         return settings == null ? new CreditSettingsRequest() : settings;
+    }
+
+    @Transactional
+    public void updateTakenCourses(String userId, List<String> courseCodes) {
+        UserCourseSelectionEntity selection = getUserCourseSelection(Long.valueOf(userId));
+        selection.setTakenCourses(new ArrayList<>(courseCodes));
+        userCourseSelectionRepository.save(selection);
+    }
+
+    @Transactional
+    public void removeTakenCourses(Long userId, List<Long> lecturesToRemove) {
+        UserCourseSelectionEntity selection = getUserCourseSelection(userId);
+        selection.getTakenCourses().removeAll(lecturesToRemove);
+        userCourseSelectionRepository.save(selection);
+    }
+
+    @Transactional
+    public void updateMandatoryCourses(String userId, List<String> courseCodes) {
+        UserCourseSelectionEntity selection = getUserCourseSelection(Long.valueOf(userId));
+        selection.setMandatoryCourses(new ArrayList<>(courseCodes));
+        userCourseSelectionRepository.save(selection);
+    }
+
+    @Transactional
+    public void removeMandatoryCourses(Long userId, List<Long> lecturesToRemove) {
+        UserCourseSelectionEntity selection = getUserCourseSelection(userId);
+        selection.getMandatoryCourses().removeAll(lecturesToRemove);
+        userCourseSelectionRepository.save(selection);
+    }
+
+    @Transactional
+    public void updateRetakeCourses(String userId, List<String> courseCodes) {
+        UserCourseSelectionEntity selection = getUserCourseSelection(Long.valueOf(userId));
+        selection.setRetakeCourses(new ArrayList<>(courseCodes));
+        userCourseSelectionRepository.save(selection);
+    }
+
+    @Transactional
+    public void removeRetakeCourses(Long userId, List<Long> lecturesToRemove) {
+        UserCourseSelectionEntity selection = getUserCourseSelection(userId);
+        selection.getRetakeCourses().removeAll(lecturesToRemove);
+        userCourseSelectionRepository.save(selection);
+    }
+
+    private List<String> removeByIndexes(List<String> original, List<Long> indexes) {
+        return original.stream()
+                .filter(e -> !indexes.contains((long) original.indexOf(e)))
+                .collect(Collectors.toList());
+    }
+
+    // userId 조회용
+    public UserCourseSelectionEntity getUserCourseSelectionById(Long userId) {
+        return userCourseSelectionRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new RuntimeException("User selection not found for id: " + userId));
     }
 }

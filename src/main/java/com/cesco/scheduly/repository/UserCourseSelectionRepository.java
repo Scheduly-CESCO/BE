@@ -9,5 +9,5 @@ import java.util.Optional;
 @Repository
 public interface UserCourseSelectionRepository extends JpaRepository<UserCourseSelectionEntity, String> { // PK 타입은 selectionId(String)
     Optional<UserCourseSelectionEntity> findByUser(User user);
-    Optional<UserCourseSelectionEntity> findByUserId(Long userId); // User의 PK 'id'를 기준으로 조회
+    Optional<UserCourseSelectionEntity> findByUser_Id(Long userId); // User의 PK 'id'를 기준으로 조회
 }
