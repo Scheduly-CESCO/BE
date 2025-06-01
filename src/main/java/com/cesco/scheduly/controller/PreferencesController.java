@@ -29,7 +29,7 @@ public class PreferencesController {
   @DeleteMapping("/completed")
   public ResponseEntity<?> removeCompletedLectures(
           @RequestParam Long userId,
-          @RequestBody List<Long> lecturesToRemove
+          @RequestBody List<String> lecturesToRemove
   ) {
     userService.removeTakenCourses(userId, lecturesToRemove);
     return ResponseEntity.ok(Map.of("status", "completed_removed"));
@@ -49,7 +49,7 @@ public class PreferencesController {
   @DeleteMapping("/required")
   public ResponseEntity<?> removeRequiredLectures(
           @RequestParam Long userId,
-          @RequestBody List<Long> lecturesToRemove
+          @RequestBody List<String> lecturesToRemove
   ) {
     userService.removeMandatoryCourses(userId, lecturesToRemove);
     return ResponseEntity.ok(Map.of("status", "required_removed"));
@@ -69,7 +69,7 @@ public class PreferencesController {
   @DeleteMapping("/retake")
   public ResponseEntity<?> removeRetakeLectures(
           @RequestParam Long userId,
-          @RequestBody List<Long> lecturesToRemove
+          @RequestBody List<String> lecturesToRemove
   ) {
     userService.removeRetakeCourses(userId, lecturesToRemove);
     return ResponseEntity.ok(Map.of("status", "retake_removed"));

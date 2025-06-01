@@ -202,7 +202,7 @@ public class UserService {
     }
 
     @Transactional
-    public void removeTakenCourses(Long userId, List<Long> lecturesToRemove) {
+    public void removeTakenCourses(Long userId, List<String> lecturesToRemove) {
         UserCourseSelectionEntity selection = getUserCourseSelection(userId);
         selection.getTakenCourses().removeAll(lecturesToRemove);
         userCourseSelectionRepository.save(selection);
@@ -216,7 +216,7 @@ public class UserService {
     }
 
     @Transactional
-    public void removeMandatoryCourses(Long userId, List<Long> lecturesToRemove) {
+    public void removeMandatoryCourses(Long userId, List<String> lecturesToRemove) {
         UserCourseSelectionEntity selection = getUserCourseSelection(userId);
         selection.getMandatoryCourses().removeAll(lecturesToRemove);
         userCourseSelectionRepository.save(selection);
@@ -230,7 +230,7 @@ public class UserService {
     }
 
     @Transactional
-    public void removeRetakeCourses(Long userId, List<Long> lecturesToRemove) {
+    public void removeRetakeCourses(Long userId, List<String> lecturesToRemove) {
         UserCourseSelectionEntity selection = getUserCourseSelection(userId);
         selection.getRetakeCourses().removeAll(lecturesToRemove);
         userCourseSelectionRepository.save(selection);

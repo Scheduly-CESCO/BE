@@ -23,7 +23,7 @@ public class UserCourseSelectionEntity {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id", nullable = false, unique = true) // User 엔티티의 PK 'id'(Long) 참조
-    private User user; // 팀원 User 엔티티 사용
+    private User user;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_taken_courses", joinColumns = @JoinColumn(name = "selection_id"))

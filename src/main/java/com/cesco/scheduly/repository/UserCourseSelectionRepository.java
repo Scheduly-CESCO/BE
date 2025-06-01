@@ -11,3 +11,4 @@ public interface UserCourseSelectionRepository extends JpaRepository<UserCourseS
     Optional<UserCourseSelectionEntity> findByUser(User user);
     Optional<UserCourseSelectionEntity> findByUser_Id(Long userId); // User의 PK 'id'를 기준으로 조회
 }
+
