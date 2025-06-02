@@ -32,7 +32,7 @@ public class CourseDataService {
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
         try {
-            File file = ResourceUtils.getFile("classpath:data/everytime_final.json");
+            File file = ResourceUtils.getFile("classpath:data/everytime_courses.json");
             List<DetailedCourseInfo> loadedCourses = objectMapper.readValue(file, new TypeReference<List<DetailedCourseInfo>>() {});
 
             this.allDetailedCourses = loadedCourses.stream()
@@ -100,7 +100,7 @@ public class CourseDataService {
             logger.info("{}개의 상세 강의 정보 로드 및 처리 완료 (CourseDataService).", this.allDetailedCourses.size());
 
         } catch (IOException e) {
-            logger.error("강의 데이터(everytime_final.json) 로드/파싱 실패: {}", e.getMessage(), e);
+            logger.error("강의 데이터(everytime_courses.json) 로드/파싱 실패: {}", e.getMessage(), e);
             this.allDetailedCourses = new ArrayList<>();
             this.courseCatalogForSearch.clear();
         }

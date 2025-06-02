@@ -9,17 +9,17 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-// import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter; // JWT 필터 사용 시
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    // private final JwtTokenProvider jwtTokenProvider; // JWT 필터 사용 시 주입
+    private final JwtTokenProvider jwtTokenProvider; // JWT 필터 사용 시 주입
 
-    // public SecurityConfig(JwtTokenProvider jwtTokenProvider) {
-    //    this.jwtTokenProvider = jwtTokenProvider;
-    // }
+    public SecurityConfig(JwtTokenProvider jwtTokenProvider) {
+        this.jwtTokenProvider = jwtTokenProvider;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
