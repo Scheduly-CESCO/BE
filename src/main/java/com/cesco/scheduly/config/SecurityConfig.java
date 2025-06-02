@@ -32,16 +32,16 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // REST API에서는 보통 CSRF 비활성화
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 사용 안 함 (토큰 기반 인증)
                 .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll() // 회원가입, 로그인은 누구나
-                        .requestMatchers(HttpMethod.GET, "/api/courses/search").permitAll() // 강의 검색은 누구나
-                        // /api/preferences 경로는 인증된 사용자만 (PreferencesController)
-                        .requestMatchers(HttpMethod.POST, "/api/preferences").authenticated()
-                        // /api/lectures 경로는 인증된 사용자만 (LectureFilterController) - 기능 활성화 시
-                        .requestMatchers("/api/lectures/**").authenticated()
-                        // /api/users/{userId}/timetable/** 경로는 인증된 사용자만 (TimetableController)
-                        .requestMatchers("/api/users/{userId}/timetable/**").authenticated()
-                        // TODO: UserController에 남은 API가 있다면 경로 규칙 추가
-                        // .requestMatchers("/api/users/**").authenticated() // 만약 UserController에 다른 API가 있다면
+                        .requestMatchers("/auth/signup", "/auth/login").permitAll() // 회원가입, 로그인은 누구나
+                        .requestMatchers(HttpMethod.GET, "/courses/search").permitAll() // 강의 검색은 누구나
+                        // /preferences 경로는 인증된 사용자만 (PreferencesController)
+                        .requestMatchers("/preferences/**").authenticated()
+                        // /lectures 경로는 인증된 사용자만 (LectureFilterController) - 기능 활성화 시
+                        .requestMatchers("/lectures/**").authenticated()
+                        // /users/{userId}/timetable/** 경로는 인증된 사용자만 (TimetableController)
+                        .requestMatchers("/users/{userId}/timetable/**").authenticated()
+                        // TODO: AuthController 남은 API가 있다면 경로 규칙 추가
+                        // .requestMatchers("/users/**").authenticated() // 만약 UserController에 다른 API가 있다면
                         .anyRequest().authenticated() // 그 외 모든 요청은 인증 필요 (permitAll() 대신)
                 );
 

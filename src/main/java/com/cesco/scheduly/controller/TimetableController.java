@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/users/{userId}/timetable") // userId 경로 변수 사용
+@RequestMapping("/users/{userId}/timetable") // userId 경로 변수 사용
 public class TimetableController {
 
     private final TimetableService timetableService;
