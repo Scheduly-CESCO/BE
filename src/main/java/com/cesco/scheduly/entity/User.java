@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*; // Getter, Setter, NoArgsConstructor, AllArgsConstructor, Builder 모두 포함
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "users") // 명시적으로 테이블명 지정 권장
@@ -28,9 +29,21 @@ public class User {
     private String name;
 
     @Column(nullable = false)
+    private String college;
+
+    @Column(nullable = false)
     private String major; // 주전공
 
+    @Column(nullable = false)
+    private String doubleMajorType;
+
     private String doubleMajor; // 이중전공 (선택 사항이므로 nullable=true 기본값)
+
+    @ElementCollection
+    private List<String> fusionModules;
+
+    @ElementCollection
+    private List<String> fusionSubModules;
 
     @Column(nullable = false)
     private int grade; // 학년
@@ -38,6 +51,19 @@ public class User {
     @Column(nullable = false)
     private int semester; // 학기
 
+    private String module1;
+    private String module2;
+    private String module3;
+
     @Builder.Default // 빌더 사용 시 기본값 설정
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Transient
+    public int getAdmissionYear() {
+        try {
+            return Integer.parseInt(this.studentId.substring(0,4));
+        } catch (Exception e) {
+            throw new IllegalStateException("학번의 형식이 잘못되었습니다: " + studentId);
+        }
+    }
 }

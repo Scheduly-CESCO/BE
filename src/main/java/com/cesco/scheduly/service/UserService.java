@@ -13,6 +13,7 @@ import com.cesco.scheduly.exception.UserAlreadyExistsException;
 import com.cesco.scheduly.repository.UserCourseSelectionRepository;
 import com.cesco.scheduly.repository.UserPreferenceRepository;
 import com.cesco.scheduly.repository.UserRepository;
+import com.cesco.scheduly.util.GraduationRequirementUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +53,18 @@ public class UserService {
             logger.warn("Signup failed: Student ID {} already exists.", dto.getStudentId());
             throw new UserAlreadyExistsException();
         }
+
+        // 검증: 융합인재 모듈 선택 조건
+        if ("융합인재전공".equals(dto.getMajor())) {
+            if (dto.getModule1() == null || dto.getModule2() == null || dto.getModule3() == null) {
+                throw new IllegalArgumentException("융합인재전공 1전공자는 모듈 3개를 모두 선택해야 합니다.");
+            }
+        } else if ("융합인재전공".equals(dto.getDouble_major())) {
+            if (dto.getModule1() == null || dto.getModule2() == null) {
+                throw new IllegalArgumentException("융합인재전공 이중전공자는 모듈 2개를 선택해야 합니다.");
+            }
+        }
+
         // User 엔티티에 @Builder, @NoArgsConstructor, @AllArgsConstructor 어노테이션이 있다고 가정
         // User.java에 @Builder.Default로 createdAt = LocalDateTime.now()가 설정되어 있어야 함
         User user = User.builder()
@@ -62,6 +75,10 @@ public class UserService {
                 .doubleMajor(dto.getDouble_major()) // DTO의 필드명 snake_case 유의
                 .grade(dto.getGrade())
                 .semester(dto.getSemester())
+                .college(dto.getCollege())
+                .module1(dto.getModule1())
+                .module2(dto.getModule2())
+                .module3(dto.getModule3())
                 // .createdAt(LocalDateTime.now()) // User 엔티티에서 @Builder.Default 처리 권장
                 .build();
         User savedUser = userRepository.save(user);
@@ -145,6 +162,18 @@ public class UserService {
 
         userCourseSelectionRepository.save(selection);
         logger.info("Course selections saved for user ID: {}. Data: {}", userId, dto);
+    }
+
+    @Transactional
+    public int calculateGraduationCredits(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        String studentId = user.getStudentId();
+        int admissionYear = Integer.parseInt(studentId.substring(0, 4));
+        String college = user.getCollege(); // college 필드가 User에 있어야 합니다
+
+        return GraduationRequirementUtil.getGraduationCredits(college, admissionYear);
     }
 
     @Transactional(readOnly = true)
@@ -245,6 +274,6 @@ public class UserService {
     // userId 조회용
     public UserCourseSelectionEntity getUserCourseSelectionById(Long userId) {
         return userCourseSelectionRepository.findByUser_Id(userId)
-                .orElseThrow(() -> new RuntimeException("User selection not found for id: " + userId));
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
     }
 }
