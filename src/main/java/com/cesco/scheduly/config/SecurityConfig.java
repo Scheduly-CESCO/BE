@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // 세션 비활성화
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(
+                                "/",
                                 "/swagger-ui/**",
                                 "/swagger-ui/html",
                                 "/v3/api-docs/**",
