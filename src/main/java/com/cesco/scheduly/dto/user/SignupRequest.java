@@ -15,6 +15,7 @@ public class SignupRequest {
     private String college;
     private String major;
 
+    @Getter
     private String doubleMajorType; // 부전공 / 이중전공 / 전공심화 중 택1
     private String double_major;
 

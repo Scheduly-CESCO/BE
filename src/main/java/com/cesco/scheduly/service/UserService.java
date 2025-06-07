@@ -87,6 +87,7 @@ public class UserService {
                 .name(dto.getName())
                 .major(dto.getMajor())
                 .doubleMajor(dto.getDouble_major()) // DTO의 필드명 snake_case 유의
+                .doubleMajorType(dto.getDoubleMajorType()) // 부전공/이중전공/전공심화
                 .grade(dto.getGrade())
                 .semester(dto.getSemester())
                 .college(dto.getCollege())
