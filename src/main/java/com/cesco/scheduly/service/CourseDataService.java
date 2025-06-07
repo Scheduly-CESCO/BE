@@ -8,10 +8,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ResourceUtils;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,8 +31,12 @@ public class CourseDataService {
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
         try {
-            File file = ResourceUtils.getFile("classpath:data/everytime_courses.json");
-            List<DetailedCourseInfo> loadedCourses = objectMapper.readValue(file, new TypeReference<List<DetailedCourseInfo>>() {});
+            ClassPathResource resource = new ClassPathResource("data/everytime_courses.json");
+
+            List<DetailedCourseInfo> loadedCourses = objectMapper.readValue(
+                    resource.getInputStream(),
+                    new TypeReference<List<DetailedCourseInfo>>() {}
+            );
 
             this.allDetailedCourses = loadedCourses.stream()
                     .filter(c -> c != null && c.getCourseCode() != null && !c.getCourseCode().isBlank() && c.getCourseName() != null && !c.getCourseName().isBlank())
