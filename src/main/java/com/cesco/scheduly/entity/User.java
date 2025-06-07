@@ -1,10 +1,9 @@
 package com.cesco.scheduly.entity;
 
 import jakarta.persistence.*;
-import lombok.*; // Getter, Setter, NoArgsConstructor, AllArgsConstructor, Builder 모두 포함
+import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
 @Table(name = "users") // 명시적으로 테이블명 지정 권장
@@ -38,12 +37,6 @@ public class User {
     private String doubleMajorType;
 
     private String doubleMajor; // 이중전공 (선택 사항이므로 nullable=true 기본값)
-
-    @ElementCollection
-    private List<String> fusionModules;
-
-    @ElementCollection
-    private List<String> fusionSubModules;
 
     @Column(nullable = false)
     private int grade; // 학년
