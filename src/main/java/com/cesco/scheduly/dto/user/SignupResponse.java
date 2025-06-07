@@ -5,6 +5,9 @@ import com.cesco.scheduly.util.GraduationRequirementUtil;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
+
 
 @Getter
 public class SignupResponse {
@@ -28,9 +31,7 @@ public class SignupResponse {
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
 
-    private String module1;
-    private String module2;
-    private String module3;
+    private List<String> modules;
 
     public SignupResponse(User user) {
         this.id = user.getId();
@@ -42,8 +43,18 @@ public class SignupResponse {
         this.admissionYear = GraduationRequirementUtil.extractAdmissionYear(user.getStudentId());
         this.graduationCredits = GraduationRequirementUtil.getGraduationCredits(user.getCollege(), admissionYear);
         this.createdAt = user.getCreatedAt();
-        this.module1 = user.getModule1();
-        this.module2 = user.getModule2();
-        this.module3 = user.getModule3();
+
+        // User 엔티티의 module 필드를 기반으로 modules 리스트를 동적으로 생성
+        List<String> userModules = new ArrayList<>();
+        if (user.getModule1() != null) {
+            userModules.add(user.getModule1());
+        }
+        if (user.getModule2() != null) {
+            userModules.add(user.getModule2());
+        }
+        if (user.getModule3() != null) {
+            userModules.add(user.getModule3());
+        }
+        this.modules = userModules;
     }
 }

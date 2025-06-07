@@ -54,15 +54,29 @@ public class UserService {
             throw new UserAlreadyExistsException();
         }
 
-        // 검증: 융합인재 모듈 선택 조건
+        // 1. 모듈 정보를 담을 지역 변수 선언 및 null로 초기화
+        String module1 = null;
+        String module2 = null;
+        String module3 = null;
+
+        List<String> modules = dto.getModules(); // DTO에서 모듈 리스트를 가져옴
+
         if ("융합인재전공".equals(dto.getMajor())) {
-            if (dto.getModule1() == null || dto.getModule2() == null || dto.getModule3() == null) {
-                throw new IllegalArgumentException("융합인재전공 1전공자는 모듈 3개를 모두 선택해야 합니다.");
+
+            if (modules == null || modules.size() != 3) {
+                throw new IllegalArgumentException("융합인재전공(주전공)은 3개의 모듈을 선택해야 합니다.");
             }
+            // 2. 조건 만족 시, 지역 변수에 모듈 정보 할당
+            module1 = modules.get(0);
+            module2 = modules.get(1);
+            module3 = modules.get(2);
         } else if ("융합인재전공".equals(dto.getDouble_major())) {
-            if (dto.getModule1() == null || dto.getModule2() == null) {
-                throw new IllegalArgumentException("융합인재전공 이중전공자는 모듈 2개를 선택해야 합니다.");
+            if (modules == null || modules.size() != 2) {
+                throw new IllegalArgumentException("융합인재전공(이중전공)은 2개의 모듈을 선택해야 합니다.");
             }
+            // 2. 조건 만족 시, 지역 변수에 모듈 정보 할당
+            module1 = modules.get(0);
+            module2 = modules.get(1);
         }
 
         // User 엔티티에 @Builder, @NoArgsConstructor, @AllArgsConstructor 어노테이션이 있다고 가정
@@ -76,9 +90,9 @@ public class UserService {
                 .grade(dto.getGrade())
                 .semester(dto.getSemester())
                 .college(dto.getCollege())
-                .module1(dto.getModule1())
-                .module2(dto.getModule2())
-                .module3(dto.getModule3())
+                .module1(module1)
+                .module2(module2)
+                .module3(module3)
                 // .createdAt(LocalDateTime.now()) // User 엔티티에서 @Builder.Default 처리 권장
                 .build();
         User savedUser = userRepository.save(user);

@@ -18,13 +18,9 @@ public class SignupRequest {
     private String doubleMajorType; // 부전공 / 이중전공 / 전공심화 중 택1
     private String double_major;
 
-    private List<String> fusionModules;  // 융인이 1전공일 경우 모듈 3개
-    private List<String> fusionSubModule;  // 융인이 이중일 경우 모듈 2개
+    private List<String> modules;
 
     private int grade;
     private int semester;
 
-    private String module1;
-    private String module2;
-    private String module3;
     }
