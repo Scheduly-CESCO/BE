@@ -23,7 +23,8 @@ public class CourseDataService {
     private Map<String, CourseInfo> courseCatalogForSearch = new ConcurrentHashMap<>();
 
     private static final List<String> RESTRICTED_COURSE_KEYWORDS =
-            List.of("군사학", "신입생세미나", "교직", "rc영어", "college english", "공학영어", "자연과학영어");
+            List.of("군사학", "경상대학", "교직", "인문대학", "자연과학대학", "폴란드학과", "한국학과", "이공계열","우크라이나학과","그리스·불가리아학과",
+                    "중앙아시아학과","루마니아학과", "AI융합대학", "공과대학(공과계열)", "CULTURE&TECHNOLOGY융합대학", "체코·슬로바키아학과", "아프리카학부");
 
     @PostConstruct
     public void loadAndProcessCourseData() {
@@ -122,13 +123,7 @@ public class CourseDataService {
         // 학생의 규칙: "개설영역"이 '교양' 또는 '전공'이 아닌 데이터는 모두 '특정 사용자 대상 과목'
         // 여기서 '특정 사용자 대상 과목'을 어떻게 generalizedType으로 표현할지 결정 필요
         // 1. "교양"으로 명확히 분류
-        if (deptLower.equals("교양") || deptLower.equals("대학외국어") ||
-                deptLower.contains("생활과스포츠") || deptLower.contains("실용외국어(선택)") ||
-                deptLower.contains("미래시뮬레이션") || deptLower.contains("hufs career") ||
-                deptLower.contains("인성교육") || deptLower.contains("인간과사회") ||
-                deptLower.contains("과학과기술") || deptLower.contains("역사와철학") ||
-                deptLower.contains("문화와예술") || deptLower.equals("미네르바인문") ||
-                deptLower.equals("소프트웨어기초") || deptLower.equals("언어와문학")) {
+        if (deptLower.equals("교양")) {
             return "교양";
         }
 
@@ -143,13 +138,25 @@ public class CourseDataService {
             if (deptLower.contains(restrictedKeyword.toLowerCase())) {
                 // 각 키워드에 맞는 구체적인 타입 반환 (예: "군사학", "교직")
                 if (restrictedKeyword.equalsIgnoreCase("군사학")) return "군사학";
-                if (restrictedKeyword.equalsIgnoreCase("신입생세미나")) return "신입생세미나";
                 if (restrictedKeyword.equalsIgnoreCase("교직")) return "교직";
-                if (restrictedKeyword.equalsIgnoreCase("rc영어")) return "RC영어";
-                if (restrictedKeyword.equalsIgnoreCase("college english")) return "COLLEGE ENGLISH";
-                if (restrictedKeyword.equalsIgnoreCase("공학영어·자연과학영어")) return "공학영어·자연과학영어";
-                if (restrictedKeyword.equalsIgnoreCase("공학영어")) return "공학영어";
-                if (restrictedKeyword.equalsIgnoreCase("자연과학영어")) return "자연과학영어";
+                if (restrictedKeyword.equalsIgnoreCase("인문대학")) return "인문대학";
+                if (restrictedKeyword.equalsIgnoreCase("경상대학")) return "경상대학";
+                if (restrictedKeyword.equalsIgnoreCase("자연과학대학")) return "자연과학대학";
+                if (restrictedKeyword.equalsIgnoreCase("폴란드학과")) return "폴란드학과";
+                if (restrictedKeyword.equalsIgnoreCase("한국학과")) return "한국학과";
+                if (restrictedKeyword.equalsIgnoreCase("이공계열")) return "이공계열";
+                if (restrictedKeyword.equalsIgnoreCase("우크라이나학과")) return "우크라이나학과";
+                if (restrictedKeyword.equalsIgnoreCase("그리스·불가리아학과")) return "그리스·불가리아학과";
+                if (restrictedKeyword.equalsIgnoreCase("중앙아시아학과")) return "중앙아시아학과";
+                if (restrictedKeyword.equalsIgnoreCase("루마니아학과")) return "루마니아학과";
+                if (restrictedKeyword.equalsIgnoreCase("AI융합대학")) return "AI융합대학";
+                if (restrictedKeyword.equalsIgnoreCase("공과대학(공과계열)")) return "공과대학(공과계열)";
+                if (restrictedKeyword.equalsIgnoreCase("CULTURE&TECHNOLOGY융합대학")) return "CULTURE&TECHNOLOGY융합대학";
+                if (restrictedKeyword.equalsIgnoreCase("체코·슬로바키아학과")) return "체코·슬로바키아학과";
+                if (restrictedKeyword.equalsIgnoreCase("아프리카학부")) return "아프리카학부";
+
+
+
                 return departmentOriginal; // 명확한 매핑 없으면 원본값 또는 더 일반적인 "특수과목"
             }
         }
