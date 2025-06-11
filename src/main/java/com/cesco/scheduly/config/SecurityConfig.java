@@ -44,7 +44,8 @@ public class SecurityConfig {
                                 "/swagger-ui/html",
                                 "/v3/api-docs/**",
                                 "/swagger-resources/**",
-                                "/webjars/**"
+                                "/webjars/**",
+                                "/h2-console/**"
                         ).permitAll()
 
                         .requestMatchers("/auth/signup", "/auth/login").permitAll()
@@ -54,6 +55,9 @@ public class SecurityConfig {
                         .requestMatchers("/users/{userId}/timetable/**").authenticated()
 
                         .anyRequest().authenticated()
+                )
+                .headers(headers ->
+                        headers.frameOptions(frameOptions -> frameOptions.disable())
                 );
 
         // JWT 필터를 UsernamePasswordAuthenticationFilter 앞에 추가 (필요 시 주석 해제)

@@ -37,11 +37,11 @@ public class SignupResponse {
         this.id = user.getId();
         this.studentId = user.getStudentId();
         this.name = user.getName();
-        this.college = user.getCollege();
+        this.college = user.getCollege().name(); // College enum을 문자열로 변환, 타입 불일치 문제 해결
         this.major = user.getMajor();
         this.doubleMajor = user.getDoubleMajor();
         this.admissionYear = GraduationRequirementUtil.extractAdmissionYear(user.getStudentId());
-        this.graduationCredits = GraduationRequirementUtil.getGraduationCredits(user.getCollege(), admissionYear);
+        this.graduationCredits = GraduationRequirementUtil.getGraduationCredits(user.getCollege().name(), admissionYear);
         this.createdAt = user.getCreatedAt();
 
         // User 엔티티의 module 필드를 기반으로 modules 리스트를 동적으로 생성
