@@ -1,6 +1,7 @@
 package com.cesco.scheduly.dto.user;
 
 import com.cesco.scheduly.enums.College;
+import com.cesco.scheduly.enums.FusionMajorModule;
 import lombok.Getter;
 import lombok.Setter;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -28,6 +29,9 @@ public class SignupRequest {
     private String double_major;
 
     private List<String> modules;
+    private FusionMajorModule module1;
+    private FusionMajorModule module2;
+    private FusionMajorModule module3;
 
     private int grade;
     private int semester;

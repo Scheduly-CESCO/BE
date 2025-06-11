@@ -2,6 +2,7 @@ package com.cesco.scheduly.entity;
 
 import com.cesco.scheduly.enums.College;
 import com.cesco.scheduly.enums.DoubleMajorType;
+import com.cesco.scheduly.enums.FusionMajorModule;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -47,9 +48,14 @@ public class User {
     @Column(nullable = false)
     private int semester; // 학기
 
-    private String module1;
-    private String module2;
-    private String module3;
+    @Enumerated(EnumType.STRING)
+    private FusionMajorModule module1;
+
+    @Enumerated(EnumType.STRING)
+    private FusionMajorModule module2;
+
+    @Enumerated(EnumType.STRING)
+    private FusionMajorModule module3;
 
     @Builder.Default // 빌더 사용 시 기본값 설정
     private LocalDateTime createdAt = LocalDateTime.now();

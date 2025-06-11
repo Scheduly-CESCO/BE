@@ -10,7 +10,7 @@ import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.enums.DoubleMajorType;
-import com.cesco.scheduly.enums.College;
+import com.cesco.scheduly.enums.FusionMajorModule;
 import com.cesco.scheduly.exception.AuthenticationException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.exception.UserAlreadyExistsException;
@@ -59,28 +59,27 @@ public class UserService {
         }
 
         // 1. 모듈 정보를 담을 지역 변수 선언 및 null로 초기화
-        String module1 = null;
-        String module2 = null;
-        String module3 = null;
+        FusionMajorModule module1 = null;
+        FusionMajorModule module2 = null;
+        FusionMajorModule module3 = null;
 
         List<String> modules = dto.getModules(); // DTO에서 모듈 리스트를 가져옴
 
         if ("융합인재전공".equals(dto.getMajor())) {
-
             if (modules == null || modules.size() != 3) {
                 throw new IllegalArgumentException("융합인재전공(주전공)은 3개의 모듈을 선택해야 합니다.");
             }
-            // 2. 조건 만족 시, 지역 변수에 모듈 정보 할당
-            module1 = modules.get(0);
-            module2 = modules.get(1);
-            module3 = modules.get(2);
+            module1 = FusionMajorModule.valueOf(modules.get(0));
+            module2 = FusionMajorModule.valueOf(modules.get(1));
+            module3 = FusionMajorModule.valueOf(modules.get(2));
+
         } else if ("융합인재전공".equals(dto.getDouble_major())) {
             if (modules == null || modules.size() != 2) {
                 throw new IllegalArgumentException("융합인재전공(이중전공)은 2개의 모듈을 선택해야 합니다.");
             }
-            // 2. 조건 만족 시, 지역 변수에 모듈 정보 할당
-            module1 = modules.get(0);
-            module2 = modules.get(1);
+            module1 = FusionMajorModule.valueOf(modules.get(0));
+            module2 = FusionMajorModule.valueOf(modules.get(1));
+            // module3 remains null
         }
 
         // User 엔티티에 @Builder, @NoArgsConstructor, @AllArgsConstructor 어노테이션이 있다고 가정
