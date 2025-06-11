@@ -1,5 +1,7 @@
 package com.cesco.scheduly.entity;
 
+import com.cesco.scheduly.enums.College;
+import com.cesco.scheduly.enums.DoubleMajorType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -27,16 +29,17 @@ public class User {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String college;
+    private College college;
 
     @Column(nullable = false)
     private String major; // 주전공
 
-    @Column(nullable = false)
-    private String doubleMajorType;
-
     private String doubleMajor; // 이중전공 (선택 사항이므로 nullable=true 기본값)
+
+    @Enumerated(EnumType.STRING)
+    private DoubleMajorType doubleMajorType;
 
     @Column(nullable = false)
     private int grade; // 학년

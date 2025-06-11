@@ -3,10 +3,14 @@ package com.cesco.scheduly.service;
 import com.cesco.scheduly.dto.course.PreferencesRequest;
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
+import com.cesco.scheduly.dto.user.MyPageResponse;
+import com.cesco.scheduly.dto.user.MyPageUpdateRequest;
 import com.cesco.scheduly.dto.user.SignupRequest;
 import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
+import com.cesco.scheduly.enums.DoubleMajorType;
+import com.cesco.scheduly.enums.College;
 import com.cesco.scheduly.exception.AuthenticationException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.exception.UserAlreadyExistsException;
@@ -81,13 +85,14 @@ public class UserService {
 
         // User 엔티티에 @Builder, @NoArgsConstructor, @AllArgsConstructor 어노테이션이 있다고 가정
         // User.java에 @Builder.Default로 createdAt = LocalDateTime.now()가 설정되어 있어야 함
+        String doubleMajorType = dto.getDouble_major_type();
         User user = User.builder()
                 .studentId(dto.getStudentId())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .name(dto.getName())
                 .major(dto.getMajor())
                 .doubleMajor(dto.getDouble_major()) // DTO의 필드명 snake_case 유의
-                .doubleMajorType(dto.getDoubleMajorType()) // 부전공/이중전공/전공심화
+                .doubleMajorType(DoubleMajorType.valueOf(dto.getDouble_major_type())) // 부전공/이중전공/전공심화
                 .grade(dto.getGrade())
                 .semester(dto.getSemester())
                 .college(dto.getCollege())
@@ -186,7 +191,7 @@ public class UserService {
 
         String studentId = user.getStudentId();
         int admissionYear = Integer.parseInt(studentId.substring(0, 4));
-        String college = user.getCollege(); // college 필드가 User에 있어야 합니다
+        String college = String.valueOf(user.getCollege()); // college 필드가 User에 있어야 합니다
 
         return GraduationRequirementUtil.getGraduationCredits(college, admissionYear);
     }
@@ -286,9 +291,55 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
+    private DoubleMajorType parseDoubleMajorType(String type) {
+        if (type == null || type.isBlank()) return DoubleMajorType.NONE;
+        try {
+            return DoubleMajorType.valueOf(type.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid major type: " + type);
+        }
+    }
+
     // userId 조회용
     public UserCourseSelectionEntity getUserCourseSelectionById(Long userId) {
         return userCourseSelectionRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+    }
+
+    @Transactional(readOnly = true)
+    public MyPageResponse getMyPageInfo(Long userId) {
+        User user = getUserDetails(userId); // 이미 존재하는 메소드
+
+        return new MyPageResponse(
+                user.getName(),
+                user.getStudentId(),
+                user.getCollege(),
+                user.getMajor(),
+                user.getDoubleMajor(),
+                user.getDoubleMajorType(),
+                user.getModule1(),
+                user.getModule2(),
+                user.getModule3(),
+                user.getGrade(),
+                user.getSemester()
+        );
+    }
+
+    @Transactional
+    public void updateMyPageInfo(Long userId, MyPageUpdateRequest dto) {
+        User user = getUserDetails(userId);
+
+        user.setName(dto.getName());
+        user.setCollege(dto.getCollege());
+        user.setMajor(dto.getMajor());
+        user.setDoubleMajor(dto.getDoubleMajor());
+        user.setDoubleMajorType(dto.getDoubleMajorType());
+        user.setModule1(dto.getModule1());
+        user.setModule2(dto.getModule2());
+        user.setModule3(dto.getModule3());
+        user.setGrade(dto.getGrade());
+        user.setSemester(dto.getSemester());
+
+        userRepository.save(user);
     }
 }
