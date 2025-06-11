@@ -22,7 +22,7 @@ public class TimeSlotEntity {
     @JoinColumn(name = "course_code", nullable = false)
     private CourseEntity course;
 
-    @Column(nullable = false)
+    @Column(name = "class_day", nullable = false)
     private String day; // 요일 (예: "월")
 
     @Column(nullable = false)
