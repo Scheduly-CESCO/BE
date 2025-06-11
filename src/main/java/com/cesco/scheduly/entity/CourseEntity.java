@@ -28,7 +28,7 @@ public class CourseEntity {
     @Column(name = "department_original")
     private String departmentOriginal; // 원본 개설영역
 
-    @Column(name = "세부전공")
+    @Column(name = "specialized_major")
     private String specialized_major; // 세부전공 (예: "AI데이터융합전공", "러시아학과")
 
     @Column(name = "group_id", length = 20) // 동일과목 판단용
