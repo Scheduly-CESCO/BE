@@ -8,6 +8,8 @@ import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
 import com.cesco.scheduly.exception.MandatoryCourseConflictException;
 import com.cesco.scheduly.service.TimetableService;
 import com.cesco.scheduly.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +20,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 import java.util.List;
 
+@Tag(name = "시간표 생성 5단계 및 생성 API")
+
 @RestController
 @RequestMapping("/users/{userId}/timetable") // userId 경로 변수 사용
+
 public class TimetableController {
 
     private final TimetableService timetableService;
@@ -34,6 +39,8 @@ public class TimetableController {
     }
 
     // 5단계: 시간 선호도 저장 API
+
+    @Operation(summary = "시간 선호도 저장", description = "사용자의 시간 선호도를 저장합니다.")
     @PutMapping("/preferences/time")
     public ResponseEntity<ApiResponse> updateUserTimePreferences(
             @PathVariable Long userId, // Long 타입으로 변경
@@ -48,6 +55,7 @@ public class TimetableController {
     }
 
     // 7, 8단계 통합: 학점 목표 및 수강 희망 유형 설정 API
+    @Operation(summary = "학점 범위 및 강의 조합 설정", description = "사용자의 학점 범위와 강의 조합을 저장합니다.")
     @PutMapping("/preferences/settings")
     public ResponseEntity<ApiResponse> updateUserAcademicPlanPreferences(
             @PathVariable Long userId, // Long 타입으로 변경
@@ -67,6 +75,7 @@ public class TimetableController {
     }
 
     // 9단계: 추천 시간표 생성 요청 API
+    @Operation(summary = "추천 시간표 생성 요청", description = "시간표 생성 5단계를 기반으로 추천 시간표를 생성합니다.")
     @GetMapping("/recommendations")
     public ResponseEntity<?> getRecommendedTimetables(@PathVariable Long userId) { // Long 타입으로 변경
         try {
