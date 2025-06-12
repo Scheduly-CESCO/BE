@@ -23,7 +23,7 @@ public interface CourseRepository extends JpaRepository<CourseEntity, String> { 
      */
     @Query("SELECT c FROM CourseEntity c WHERE " +
             "(:query IS NULL OR LOWER(c.courseName) LIKE LOWER(CONCAT('%', :query, '%')) OR LOWER(c.courseCode) LIKE LOWER(CONCAT('%', :query, '%'))) AND " +
-            "(:department IS NULL OR c.specialized_major = :department) AND " +
+            "(:department IS NULL OR c.specificMajor = :department) AND " +
             "(:grade IS NULL OR c.grade = :grade)")
     List<CourseEntity> searchCourses(@Param("query") String query,
                                      @Param("department") String department,

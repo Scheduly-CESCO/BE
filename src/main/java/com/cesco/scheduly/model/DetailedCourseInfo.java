@@ -3,16 +3,13 @@ package com.cesco.scheduly.model;
 import com.cesco.scheduly.dto.timetable.TimeSlotDto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Collections;
 import java.util.List;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true) // JSON에 있지만 클래스에 없는 필드는 무시
 public class DetailedCourseInfo {
 
@@ -30,18 +27,11 @@ public class DetailedCourseInfo {
 
     private String groupId; // 학수번호 앞 7자리 (동일과목 판단용) - 서비스 로직에서 채움
 
-    private String day;          // 강의 요일 (예: "Mon", "Tue")
-    private int startPeriod;     // 시작 교시
-    private int endPeriod;       // 종료 교시
-
 
     private String generalizedType; // 1차 분류된 과목 유형 (예: "교양", "전공_후보", "군사학") - 서비스 로직에서 채움
 
     @JsonProperty("학점")
     private int credits;
-
-    @JsonProperty("시간")
-    private int totalHours;
 
     @JsonProperty("학년")
     private String grade;
@@ -80,13 +70,5 @@ public class DetailedCourseInfo {
         this.remarks = remarks;
         this.scheduleSlots = scheduleSlots;
         this.isRestrictedCourse = isRestrictedCourse;
-
-        // scheduleSlots 정보를 바탕으로 day, startPeriod, endPeriod 계산
-        if (scheduleSlots != null && !scheduleSlots.isEmpty()) {
-            TimeSlotDto firstSlot = scheduleSlots.get(0); // 첫 번째 시간 정보 사용
-            this.day = firstSlot.getDay();
-            this.startPeriod = Collections.min(firstSlot.getPeriods());
-            this.endPeriod = Collections.max(firstSlot.getPeriods());
-        }
     }
 }

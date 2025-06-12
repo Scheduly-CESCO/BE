@@ -74,19 +74,20 @@ public class CourseDataService {
             return null;
         }
 
-        // TimeSlotEntity 리스트를 TimeSlotDto 리스트로 변환
+        // ★★★ TimeSlotEntity를 TimeSlotDto로 변환하는 로직 수정 ★★★
+        // 1. DB에서 가져온 TimeSlotEntity들을 요일별로 그룹핑합니다.
         Map<String, List<Integer>> slotsByDay = entity.getScheduleSlots().stream()
                 .collect(Collectors.groupingBy(
-                        slot -> slot.getDay(),
-                        Collectors.mapping(slot -> slot.getPeriod(), Collectors.toList())
+                        slot -> slot.getDay(), // "Mon", "Tue" 등으로 그룹
+                        Collectors.mapping(slot -> slot.getPeriod(), Collectors.toList()) // 각 그룹의 교시들을 리스트로 만듦
                 ));
 
-        List<TimeSlotDto> scheduleSlots = slotsByDay.entrySet().stream()
-                .map(entry -> new TimeSlotDto(entry.getKey(), entry.getValue()))
+        // 2. 그룹핑된 데이터를 우리가 원하는 최종 DTO 형태로 변환합니다.
+        List<TimeSlotDto> finalScheduleSlots = slotsByDay.entrySet().stream()
+                .map(entry -> new TimeSlotDto(entry.getKey(), entry.getValue())) // 수정된 생성자 사용
                 .collect(Collectors.toList());
 
-        // ★★★ 수정된 생성자 호출 부분 ★★★
-        // totalHours 필드를 제거하고 새로 만든 13개짜리 생성자에 맞게 호출합니다.
+        // 3. 최종 변환된 시간 정보(finalScheduleSlots)를 DetailedCourseInfo에 담아 반환합니다.
         return new DetailedCourseInfo(
                 entity.getCourseCode(),
                 entity.getCourseName(),
@@ -99,7 +100,7 @@ public class CourseDataService {
                 entity.getProfessor(),
                 entity.getClassroom(),
                 entity.getRemarks(),
-                scheduleSlots,
+                finalScheduleSlots, // 수정된 scheduleSlots 리스트를 전달
                 entity.isRestrictedCourse()
         );
     }

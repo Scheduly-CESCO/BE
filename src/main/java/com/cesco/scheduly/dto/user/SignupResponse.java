@@ -47,13 +47,13 @@ public class SignupResponse {
         // User 엔티티의 module 필드를 기반으로 modules 리스트를 동적으로 생성
         List<String> userModules = new ArrayList<>();
         if (user.getModule1() != null) {
-            userModules.add(user.getModule1());
+            userModules.add(user.getModule1().name());
         }
         if (user.getModule2() != null) {
-            userModules.add(user.getModule2());
+            userModules.add(user.getModule2().name());
         }
         if (user.getModule3() != null) {
-            userModules.add(user.getModule3());
+            userModules.add(user.getModule3().name());
         }
         this.modules = userModules;
     }
