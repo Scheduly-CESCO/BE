@@ -7,6 +7,7 @@ import com.cesco.scheduly.dto.user.MyPageResponse;
 import com.cesco.scheduly.dto.user.MyPageUpdateRequest;
 import com.cesco.scheduly.dto.user.SignupRequest;
 import com.cesco.scheduly.entity.User;
+import com.cesco.scheduly.dto.timetable.CreditRangeDto;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.enums.DoubleMajorType;
@@ -229,10 +230,49 @@ public class UserService {
     @Transactional
     public void saveCreditAndCombinationPreferences(Long userId, CreditSettingsRequest settings) {
         logger.info("Saving credit and combination preferences for user ID: {}", userId);
+
+        validateCreditSettings(settings);
+
         UserPreferenceEntity userPref = getUserPreference(userId);
         userPref.setCreditSettings(settings != null ? settings : new CreditSettingsRequest());
         userPreferenceRepository.save(userPref);
         logger.info("Credit and combination preferences saved for user ID: {}. Data: {}", userId, settings);
+    }
+
+    private void validateCreditSettings(CreditSettingsRequest settings) {
+        // 전체 최소/최대 학점 목표가 없으면 검증할 필요가 없음
+        if (settings.getMinTotalCredits() == null || settings.getMaxTotalCredits() == null) {
+            return;
+        }
+
+        int minTotal = settings.getMinTotalCredits();
+        int maxTotal = settings.getMaxTotalCredits();
+
+        // 사용자가 설정한 유형별 학점 목표의 합계를 계산
+        int sumOfMinGoals = 0;
+        int sumOfMaxGoals = 0;
+
+        if (settings.getCreditGoalsPerType() != null) {
+            for (CreditRangeDto range : settings.getCreditGoalsPerType().values()) {
+                sumOfMinGoals += range.getMin();
+                sumOfMaxGoals += range.getMax();
+            }
+        }
+
+        // 유효성 검사 로직
+        // 1. 유형별 최소 학점의 합계가 전체 최대 학점 목표를 넘을 수 없음
+        if (sumOfMinGoals > maxTotal) {
+            throw new IllegalArgumentException(
+                    "유형별 최소 학점의 합(" + sumOfMinGoals + ")이 전체 최대 학점 목표(" + maxTotal + ")를 초과할 수 없습니다."
+            );
+        }
+
+        // 2. 유형별 최대 학점의 합계가 전체 최소 학점 목표보다 작을 수 없음
+        if (sumOfMaxGoals < minTotal) {
+            throw new IllegalArgumentException(
+                    "유형별 최대 학점의 합(" + sumOfMaxGoals + ")이 전체 최소 학점 목표(" + minTotal + ")보다 작을 수 없습니다."
+            );
+        }
     }
 
     @Transactional(readOnly = true)
@@ -340,5 +380,20 @@ public class UserService {
         user.setSemester(dto.getSemester());
 
         userRepository.save(user);
+    }
+
+    // UserService.java 내부에 추가
+
+    @Transactional(readOnly = true)
+    public List<String> getRequiredAndRetakeCourses(Long userId) {
+        UserCourseSelectionEntity selection = getUserCourseSelection(userId);
+        List<String> combinedList = new ArrayList<>();
+        if (selection.getMandatoryCourses() != null) {
+            combinedList.addAll(selection.getMandatoryCourses());
+        }
+        if (selection.getRetakeCourses() != null) {
+            combinedList.addAll(selection.getRetakeCourses());
+        }
+        return combinedList.stream().distinct().collect(Collectors.toList());
     }
 }

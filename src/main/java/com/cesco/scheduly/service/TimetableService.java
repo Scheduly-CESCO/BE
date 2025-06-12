@@ -1,13 +1,14 @@
 package com.cesco.scheduly.service;
 
 import com.cesco.scheduly.dto.timetable.*;
+import com.cesco.scheduly.entity.User;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
-import com.cesco.scheduly.entity.User; // 팀원이 제공한 User 엔티티 사용
 import com.cesco.scheduly.entity.UserPreferenceEntity;
+import com.cesco.scheduly.exception.MandatoryCourseConflictException;
 import com.cesco.scheduly.model.DetailedCourseInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired; // 생성자 주입 시 필요
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -84,13 +85,6 @@ public class TimetableService {
         return "기타";
     }
 
-    // 동일 과목 판단 (groupId 사용)
-    private boolean areCoursesEffectivelySame(DetailedCourseInfo course1, DetailedCourseInfo course2) {
-        if (course1 == null || course2 == null) return false;
-        if (Objects.equals(course1.getCourseCode(), course2.getCourseCode())) return true;
-        return course1.getGroupId() != null && course1.getGroupId().equals(course2.getGroupId());
-    }
-
     private List<DetailedCourseInfo> prepareCandidateCourses(List<DetailedCourseInfo> allCourses,
                                                              UserCourseSelectionEntity selections,
                                                              int userGrade, // User 엔티티의 grade는 int
@@ -132,35 +126,6 @@ public class TimetableService {
                 })
                 // 학년 필터링은 추천 알고리즘 내 우선순위 정렬로 처리 (이전 사용자 요청)
                 .collect(Collectors.toList());
-    }
-
-    private List<DetailedCourseInfo> getAndValidateMandatoryCourses(List<DetailedCourseInfo> candidatePool,
-                                                                    UserCourseSelectionEntity selections,
-                                                                    User currentUser, // User 타입으로 변경
-                                                                    CreditSettingsRequest creditSettings) {
-        Set<String> mandatoryAndRetakeCodesFromSelection = new HashSet<>();
-        if (selections.getMandatoryCourses() != null) mandatoryAndRetakeCodesFromSelection.addAll(selections.getMandatoryCourses());
-        if (selections.getRetakeCourses() != null) mandatoryAndRetakeCodesFromSelection.addAll(selections.getRetakeCourses());
-
-        if (mandatoryAndRetakeCodesFromSelection.isEmpty()) return Collections.emptyList();
-
-        List<DetailedCourseInfo> initialMandatoryCourses = candidatePool.stream()
-                .filter(course -> mandatoryAndRetakeCodesFromSelection.contains(course.getCourseCode()))
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<String, DetailedCourseInfo> mandatoryCoursesByGroupId = new LinkedHashMap<>();
-        for (DetailedCourseInfo course : initialMandatoryCourses) {
-            String identifier = course.getGroupId() != null ? course.getGroupId() : course.getCourseCode();
-            mandatoryCoursesByGroupId.putIfAbsent(identifier, course);
-        }
-        List<DetailedCourseInfo> validatedMandatoryCourses = new ArrayList<>(mandatoryCoursesByGroupId.values());
-
-        if (hasTimeConflictInList(validatedMandatoryCourses)) {
-            logger.error("User ID {}: 필수/재수강 과목 간 시간 중복 발생: {}", currentUser.getId(), validatedMandatoryCourses.stream().map(c -> c.getCourseName() + "(" + c.getCourseCode() + ")").collect(Collectors.joining(", ")));
-            return null;
-        }
-        return validatedMandatoryCourses;
     }
 
     public List<RecommendedTimetableDto> generateRecommendations(Long userId) { // userId는 Long
@@ -229,48 +194,48 @@ public class TimetableService {
         return recommendations;
     }
 
-    private List<DetailedCourseInfo> filterAndSortByTimePreferences(List<DetailedCourseInfo> courses, TimePreferenceRequest preferences, User currentUser) { // User 타입으로 변경
-        if (preferences == null && currentUser == null) return new ArrayList<>(courses);
-
-        List<DetailedCourseInfo> filteredCourses = courses.stream()
-                .filter(course -> meetsIndividualCourseTimePreferences(course, preferences))
-                .collect(Collectors.toList());
-
-        final int userNumericGrade = currentUser.getGrade(); // User 엔티티의 grade는 int
-        if (userNumericGrade > 0) { // 학년 정보가 유효할 때만 정렬
-            filteredCourses.sort((c1, c2) -> compareCourseGradePriority(c1, c2, userNumericGrade));
+    private List<DetailedCourseInfo> filterByTimePreferences(List<DetailedCourseInfo> courses, TimePreferenceRequest preferences) {
+        // 1. 사용자가 선호 시간대를 아예 설정하지 않았다면, 모든 과목을 그대로 반환합니다.
+        if (preferences == null || preferences.getPreferredTimeSlots() == null || preferences.getPreferredTimeSlots().isEmpty()) {
+            return courses;
         }
 
-        logger.debug("User ID {}: 시간 선호도 필터링 및 학년 우선순위 정렬 후 선택 가능 과목 수: {}", (currentUser != null ? currentUser.getId() : "N/A"), filteredCourses.size());
-        return filteredCourses;
-    }
+        // 2. 사용자가 선택한 모든 선호 시간대를 '허용된 시간 지도'로 만듭니다.
+        //    예: { "Mon": {1, 2, 3, 4}, "Wed": {3, 4} }
+        Map<String, Set<Integer>> allowedSlotsMap = new HashMap<>();
+        for (TimeSlotDto preferredSlot : preferences.getPreferredTimeSlots()) {
+            if (preferredSlot.getDay() != null && preferredSlot.getPeriods() != null) {
+                allowedSlotsMap
+                        .computeIfAbsent(preferredSlot.getDay(), k -> new HashSet<>())
+                        .addAll(preferredSlot.getPeriods());
+            }
+        }
 
-    private boolean meetsIndividualCourseTimePreferences(DetailedCourseInfo course, TimePreferenceRequest preferences) {
-        // (이전 답변과 동일)
-        if (preferences == null) return true;
-        if (course.getScheduleSlots() == null || course.getScheduleSlots().isEmpty()) return true;
-
-        for (TimeSlotDto slot : course.getScheduleSlots()) {
-            if (slot.getDay() == null || slot.getPeriods() == null || slot.getPeriods().isEmpty()) continue;
-
-            if (preferences.getAvoidDays() != null && !preferences.getAvoidDays().isEmpty() &&
-                    preferences.getAvoidDays().contains(slot.getDay())) {
-                logger.trace("기피 요일 위반으로 과목 제외: {} ({})", course.getCourseName(), slot.getDay());
+        // 3. 전체 과목 목록에서, '허용된 시간 지도' 안에 완전히 포함되는 과목만 남깁니다.
+        return courses.stream().filter(course -> {
+            // 강의에 시간 정보가 없으면 추천 대상에서 제외합니다.
+            if (course.getScheduleSlots() == null || course.getScheduleSlots().isEmpty()) {
                 return false;
             }
-            if (preferences.getAvoidTimeSlots() != null && !preferences.getAvoidTimeSlots().isEmpty()) {
-                for (TimeSlotDto avoidSlot : preferences.getAvoidTimeSlots()) {
-                    if (avoidSlot.getDay() != null && avoidSlot.getPeriods() != null && !avoidSlot.getPeriods().isEmpty() &&
-                            avoidSlot.getDay().equals(slot.getDay()) &&
-                            !Collections.disjoint(avoidSlot.getPeriods(), slot.getPeriods())) {
-                        logger.trace("기피 시간대 위반으로 과목 제외: {} ({} {}교시)", course.getCourseName(), slot.getDay(), slot.getPeriods());
-                        return false;
-                    }
+
+            // 해당 과목의 '모든' 수업 시간이 '허용된 시간 지도'에 포함되어야 합니다.
+            for (TimeSlotDto courseSlot : course.getScheduleSlots()) {
+                Set<Integer> allowedPeriods = allowedSlotsMap.get(courseSlot.getDay());
+                // 해당 요일에 허용된 시간이 없거나(null),
+                // 과목의 교시들 중 허용되지 않은 교시가 하나라도 있다면(!containsAll) 이 과목은 탈락입니다.
+                if (allowedPeriods == null || !allowedPeriods.containsAll(courseSlot.getPeriods())) {
+                    return false;
                 }
             }
-        }
-        return true;
+            // 모든 시간 검사를 통과한 과목만 살아남습니다.
+            return true;
+        }).collect(Collectors.toList());
     }
+
+
+    // TimetableService.java 내부에 위치
+
+    // TimetableService.java 내부에 위치
 
     private List<List<DetailedCourseInfo>> findTimetableCombinations(
             List<DetailedCourseInfo> initialTimetableBase,
@@ -278,7 +243,7 @@ public class TimetableService {
             TimePreferenceRequest timePreferences,
             CreditSettingsRequest creditSettings,
             int numRecommendationsNeeded,
-            User currentUser, // User 타입으로 변경
+            User currentUser,
             List<String> targetCourseTypes) {
 
         List<List<DetailedCourseInfo>> validTimetables = new ArrayList<>();
@@ -289,31 +254,41 @@ public class TimetableService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        List<DetailedCourseInfo> electivePool = availableCoursePool.stream()
+        // 1. 시간 선호도에 맞는 과목만 먼저 걸러냅니다.
+        List<DetailedCourseInfo> timeFilteredPool = filterByTimePreferences(availableCoursePool, timePreferences);
+
+        // 2. 그 결과 중에서 추가적인 필터링을 수행합니다.
+        List<DetailedCourseInfo> electivePool = timeFilteredPool.stream()
+                // 필수/재수강으로 이미 선택된 동일계열 과목 제외
                 .filter(c -> c.getGroupId() == null || !initialCourseGroupIds.contains(c.getGroupId()))
-                .filter(c -> {
-                    if (c.isRestrictedCourse()) {
-                        String actualType = getActualCourseTypeForUser(c, currentUser, creditSettings);
-                        return targetCourseTypes.contains(actualType);
+
+                // ★★★ 핵심 성능 개선 필터 ★★★
+                .filter(course -> {
+                    // 사용자가 학점 목표를 설정한 유형이 없다면 모든 과목을 대상으로 함
+                    if (targetCourseTypes.isEmpty()) {
+                        return true;
                     }
-                    return true;
+
+                    // 과목의 실제 유형을 판단
+                    String actualType = getActualCourseTypeForUser(course, currentUser, creditSettings);
+
+                    // 사용자가 목표를 설정한 유형의 과목이거나, "자선" 또는 "일반선택" 과목만 후보로 인정
+                    return targetCourseTypes.contains(actualType) || "자선".equals(actualType) || "일반선택".equals(actualType);
                 })
                 .collect(Collectors.toList());
 
-        electivePool = filterAndSortByTimePreferences(electivePool, timePreferences, currentUser);
-
-        logger.debug("User ID {}: 초기 조합 ({}개): [{}], 정렬된 선택 가능 풀 ({}개): [{}]",
+        logger.debug("User ID {}: 초기 조합 ({}개), 최종 필터링된 선택 가능 풀 ({}개)",
                 currentUser.getId(),
                 currentCombination.size(),
-                currentCombination.stream().map(DetailedCourseInfo::getCourseName).collect(Collectors.joining(", ")),
-                electivePool.size(),
-                electivePool.stream().map(DetailedCourseInfo::getCourseName).collect(Collectors.joining(", "))
+                electivePool.size()
         );
 
+        // 이제 대폭 줄어든 electivePool을 가지고 조합을 시작합니다.
         generateCombinationsRecursive(
-                electivePool, 0, currentCombination, validTimetables,
-                timePreferences, creditSettings, numRecommendationsNeeded, currentUser, targetCourseTypes
+                electivePool, 0, currentCombination, validTimetables, timePreferences,
+                creditSettings, numRecommendationsNeeded, currentUser, targetCourseTypes
         );
+
         return validTimetables.stream().limit(numRecommendationsNeeded).collect(Collectors.toList());
     }
 
@@ -324,7 +299,7 @@ public class TimetableService {
             TimePreferenceRequest timePreferences,
             CreditSettingsRequest creditSettings,
             int numRecommendationsNeeded,
-            User currentUser, // User 타입으로 변경
+            User currentUser,
             List<String> targetCourseTypes) {
 
         if (validTimetables.size() >= numRecommendationsNeeded) {
@@ -334,20 +309,28 @@ public class TimetableService {
         Map<String, Integer> currentCreditsByType = calculateCreditsByTypeForUser(currentCombination, currentUser, creditSettings, targetCourseTypes);
         int currentTotalCredits = currentCreditsByType.values().stream().mapToInt(Integer::intValue).sum();
 
+        // 1. 학점 조건만 만족하는지 확인합니다.
         if (meetsAllCreditCriteriaForUser(currentCombination, currentUser, creditSettings, targetCourseTypes)) {
-            if (meetsTimePreferences(currentCombination, timePreferences)) {
-                Set<String> currentCombinationGroupIds = currentCombination.stream().map(DetailedCourseInfo::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet());
-                boolean isDuplicate = validTimetables.stream()
-                        .anyMatch(existing -> existing.stream().map(DetailedCourseInfo::getGroupId).filter(Objects::nonNull).collect(Collectors.toSet())
-                                .equals(currentCombinationGroupIds) && existing.size() == currentCombination.size());
-                if (!isDuplicate) {
-                    validTimetables.add(new ArrayList<>(currentCombination));
-                    logger.info("User ID {}: 유효한 시간표 발견! (현재 {}개 찾음) 과목: [{}], 총학점: {}",
-                            currentUser.getId(), validTimetables.size(),
-                            currentCombination.stream().map(DetailedCourseInfo::getCourseName).collect(Collectors.joining(", ")),
-                            currentTotalCredits);
-                    if (validTimetables.size() >= numRecommendationsNeeded) return;
-                }
+
+            // 이미 선호 시간에 맞는 과목들만 넘어왔기 때문에, 이 검사는 더 이상 필요 없습니다.
+            Set<String> currentCombinationGroupIds = currentCombination.stream()
+                    .map(DetailedCourseInfo::getGroupId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            boolean isDuplicate = validTimetables.stream()
+                    .anyMatch(existing -> existing.stream().map(DetailedCourseInfo::getGroupId)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toSet())
+                            .equals(currentCombinationGroupIds) && existing.size() == currentCombination.size());
+
+            if (!isDuplicate) {
+                validTimetables.add(new ArrayList<>(currentCombination));
+                logger.info("User ID {}: 유효한 시간표 발견! (현재 {}개 찾음) 과목: [{}], 총학점: {}",
+                        currentUser.getId(), validTimetables.size(),
+                        currentCombination.stream().map(DetailedCourseInfo::getCourseName).collect(Collectors.joining(", ")),
+                        currentTotalCredits);
+                if (validTimetables.size() >= numRecommendationsNeeded) return;
             }
         }
 
@@ -445,42 +428,39 @@ public class TimetableService {
         return false;
     }
 
-    private boolean meetsTimePreferences(List<DetailedCourseInfo> timetable, TimePreferenceRequest preferences) {
-        // (이전 답변과 동일, null 체크 강화)
-        if (preferences == null) return true;
-        boolean noAvoidance = (preferences.getAvoidDays() == null || preferences.getAvoidDays().isEmpty()) &&
-                (preferences.getAvoidTimeSlots() == null || preferences.getAvoidTimeSlots().isEmpty());
-        boolean noPreferenceDetails = (preferences.getPreferredDays() == null || preferences.getPreferredDays().isEmpty()) &&
-                (preferences.getPreferredTimeSlots() == null || preferences.getPreferredTimeSlots().isEmpty()) &&
-                (preferences.getPreferredPeriodBlocks() == null || preferences.getPreferredPeriodBlocks().isEmpty());
-        boolean noOtherPrefs = preferences.getPreferNoClassDays() == null;
+    private List<DetailedCourseInfo> getAndValidateMandatoryCourses(List<DetailedCourseInfo> candidatePool,
+                                                                    UserCourseSelectionEntity selections,
+                                                                    User currentUser,
+                                                                    CreditSettingsRequest creditSettings) {
+        Set<String> mandatoryAndRetakeCodesFromSelection = new HashSet<>();
+        if (selections.getMandatoryCourses() != null) mandatoryAndRetakeCodesFromSelection.addAll(selections.getMandatoryCourses());
+        if (selections.getRetakeCourses() != null) mandatoryAndRetakeCodesFromSelection.addAll(selections.getRetakeCourses());
 
-        if (noAvoidance && noPreferenceDetails && noOtherPrefs) return true;
+        if (mandatoryAndRetakeCodesFromSelection.isEmpty()) return Collections.emptyList();
 
-        for (DetailedCourseInfo course : timetable) {
-            if (course.getScheduleSlots() == null || course.getScheduleSlots().isEmpty()) continue;
-            for (TimeSlotDto slot : course.getScheduleSlots()) {
-                if (slot.getDay() == null || slot.getPeriods() == null || slot.getPeriods().isEmpty()) continue;
+        List<DetailedCourseInfo> initialMandatoryCourses = candidatePool.stream()
+                .filter(course -> mandatoryAndRetakeCodesFromSelection.contains(course.getCourseCode()))
+                .distinct()
+                .collect(Collectors.toList());
 
-                if (preferences.getAvoidDays() != null && !preferences.getAvoidDays().isEmpty() && preferences.getAvoidDays().contains(slot.getDay())) {
-                    logger.trace("시간표 구성 중 기피 요일 위반: {} ({})", course.getCourseName(), slot.getDay());
-                    return false;
-                }
-                if (preferences.getAvoidTimeSlots() != null && !preferences.getAvoidTimeSlots().isEmpty()) {
-                    for (TimeSlotDto avoidSlot : preferences.getAvoidTimeSlots()) {
-                        if (avoidSlot.getDay() != null && avoidSlot.getPeriods() != null && !avoidSlot.getPeriods().isEmpty() &&
-                                avoidSlot.getDay().equals(slot.getDay()) &&
-                                !Collections.disjoint(avoidSlot.getPeriods(), slot.getPeriods())) {
-                            logger.trace("시간표 구성 중 기피 시간대 위반: {} ({} {}교시)", course.getCourseName(), slot.getDay(), slot.getPeriods());
-                            return false;
-                        }
-                    }
-                }
-            }
+        Map<String, DetailedCourseInfo> mandatoryCoursesByGroupId = new LinkedHashMap<>();
+        for (DetailedCourseInfo course : initialMandatoryCourses) {
+            String identifier = course.getGroupId() != null ? course.getGroupId() : course.getCourseCode();
+            mandatoryCoursesByGroupId.putIfAbsent(identifier, course);
         }
-        return true;
-    }
+        List<DetailedCourseInfo> validatedMandatoryCourses = new ArrayList<>(mandatoryCoursesByGroupId.values());
 
+        // ★★★ 핵심 수정 부분 ★★★
+        if (hasTimeConflictInList(validatedMandatoryCourses)) {
+            // 시간이 중복되면, 어떤 과목들이 문제인지 메시지를 만들어 새로운 예외를 발생시킨다.
+            String conflictingCourses = validatedMandatoryCourses.stream()
+                    .map(c -> c.getCourseName() + "(" + c.getCourseCode() + ")")
+                    .collect(Collectors.joining(", "));
+            logger.error("User ID {}: 필수/재수강 과목 간 시간 중복 발생: {}", currentUser.getId(), conflictingCourses);
+            throw new MandatoryCourseConflictException("필수/재수강 과목 간 시간이 중복됩니다: " + conflictingCourses);
+        }
+        return validatedMandatoryCourses;
+    }
     private boolean canAddCourseCreditWiseForUser(DetailedCourseInfo courseToAdd,
                                                   Map<String, Integer> currentCreditsByType,
                                                   int currentTotalCredits,
