@@ -33,6 +33,9 @@ public class DetailedCourseInfo {
     @JsonProperty("학점")
     private int credits;
 
+    @JsonProperty("시간")
+    private int totalHours;
+
     @JsonProperty("학년")
     private String grade;
 
@@ -54,7 +57,7 @@ public class DetailedCourseInfo {
 
     // ★★★ 여러 시간대 수업을 처리하기 위한 추가 생성자 ★★★
     public DetailedCourseInfo(String courseCode, String courseName, String departmentOriginal, String specificMajor,
-                              String groupId, String generalizedType, int credits, String grade,
+                              String groupId, String generalizedType, int credits, int totalHours, String grade,
                               String professor, String classroom, String remarks,
                               List<TimeSlotDto> scheduleSlots, boolean isRestrictedCourse) {
         this.courseCode = courseCode;
@@ -64,6 +67,7 @@ public class DetailedCourseInfo {
         this.groupId = groupId;
         this.generalizedType = generalizedType;
         this.credits = credits;
+        this.totalHours = totalHours;
         this.grade = grade;
         this.professor = professor;
         this.classroom = classroom;

@@ -76,6 +76,7 @@ public class DataInitializer {
                 .groupId(groupId)
                 .generalizedType(generalizedType)
                 .credits(dto.getCredits())
+                .totalHours(dto.getTotalHours())
                 .grade(dto.getGrade())
                 .professor(dto.getProfessor())
                 .classroom(dto.getClassroom())

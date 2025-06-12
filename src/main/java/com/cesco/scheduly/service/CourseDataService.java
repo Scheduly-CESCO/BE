@@ -96,6 +96,7 @@ public class CourseDataService {
                 entity.getGroupId(),
                 entity.getGeneralizedType(),
                 entity.getCredits(),
+                entity.getTotalHours(),
                 entity.getGrade(),
                 entity.getProfessor(),
                 entity.getClassroom(),
