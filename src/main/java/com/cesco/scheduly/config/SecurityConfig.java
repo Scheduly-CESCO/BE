@@ -40,6 +40,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(
                                 "/",
+                                "/health",
                                 "/swagger-ui/**",
                                 "/swagger-ui/html",
                                 "/v3/api-docs/**",

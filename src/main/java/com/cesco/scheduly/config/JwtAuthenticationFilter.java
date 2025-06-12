@@ -25,6 +25,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
+        if ("/health".equals(request.getRequestURI())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String token = resolveToken(request);
         if (token != null && jwtTokenProvider.validateToken(token)) {
             var userDetails = jwtTokenProvider.getAuthentication(token);
