@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/graduation")
+@RequestMapping("/graduation")
 public class GraduationController {
 
     @GetMapping("/credits")

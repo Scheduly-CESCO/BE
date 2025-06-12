@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
-@RequestMapping("/api/university")
+@RequestMapping("/university")
 public class CollegeMajorController {
 
     // 전체 단과대 리스트 반환
