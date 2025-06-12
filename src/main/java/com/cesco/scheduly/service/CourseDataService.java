@@ -70,7 +70,9 @@ public class CourseDataService {
 
     // DB Entity를 기존 서비스 로직이 사용하는 모델(DetailedCourseInfo)로 변환하는 어댑터 메소드
     private DetailedCourseInfo entityToDetailedInfo(CourseEntity entity) {
-        if (entity == null) return null;
+        if (entity == null) {
+            return null;
+        }
 
         // TimeSlotEntity 리스트를 TimeSlotDto 리스트로 변환
         Map<String, List<Integer>> slotsByDay = entity.getScheduleSlots().stream()
@@ -83,15 +85,16 @@ public class CourseDataService {
                 .map(entry -> new TimeSlotDto(entry.getKey(), entry.getValue()))
                 .collect(Collectors.toList());
 
+        // ★★★ 수정된 생성자 호출 부분 ★★★
+        // totalHours 필드를 제거하고 새로 만든 13개짜리 생성자에 맞게 호출합니다.
         return new DetailedCourseInfo(
                 entity.getCourseCode(),
                 entity.getCourseName(),
                 entity.getDepartmentOriginal(),
-                entity.getSpecialized_major(),
+                entity.getSpecificMajor(),
                 entity.getGroupId(),
                 entity.getGeneralizedType(),
                 entity.getCredits(),
-                entity.getTotalHours(),
                 entity.getGrade(),
                 entity.getProfessor(),
                 entity.getClassroom(),

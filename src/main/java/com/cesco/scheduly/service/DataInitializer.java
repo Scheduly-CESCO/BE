@@ -72,7 +72,7 @@ public class DataInitializer {
                 .courseCode(dto.getCourseCode())
                 .courseName(dto.getCourseName())
                 .departmentOriginal(dto.getDepartmentOriginal())
-                .specialized_major(dto.getSpecificMajor())
+                .specificMajor(dto.getSpecificMajor())
                 .groupId(groupId)
                 .generalizedType(generalizedType)
                 .credits(dto.getCredits())
