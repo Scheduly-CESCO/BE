@@ -98,4 +98,15 @@ public class TimetableController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse("시간표 추천 중 내부 서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요."));
         }
     }
+
+    @Operation(summary = "생성된 시간표 저장")
+    @PostMapping("/save")
+    public ResponseEntity<ApiResponse> saveTimetable(
+            @PathVariable Long userId,
+            @RequestBody RecommendedTimetableDto timetableDto) {
+
+        userService.saveTimetable(userId, timetableDto);
+        return ResponseEntity.ok(new ApiResponse("시간표가 성공적으로 저장되었습니다."));
+    }
+
 }

@@ -6,6 +6,8 @@ import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.exception.MandatoryCourseConflictException;
 import com.cesco.scheduly.model.DetailedCourseInfo;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,167 +21,85 @@ public class TimetableService {
 
     private static final Logger logger = LoggerFactory.getLogger(TimetableService.class);
 
-    private final UserService userService; // UserService는 User 엔티티를 반환하도록 수정되었다고 가정
+    private final UserService userService;
     private final CourseDataService courseDataService;
+    private final ObjectMapper objectMapper; // JSON 변환을 위해 ObjectMapper 주입
+
+    private static final int MAX_RECOMMENDATIONS = 5; // 생성할 최대 추천 시간표 개수
 
     @Autowired
-    public TimetableService(UserService userService, CourseDataService courseDataService) {
+    public TimetableService(UserService userService, CourseDataService courseDataService, ObjectMapper objectMapper) {
         this.userService = userService;
         this.courseDataService = courseDataService;
+        this.objectMapper = objectMapper; // ObjectMapper 초기화
     }
 
-    // 사용자별로 과목의 실제 유형("전공", "이중전공", "교양", "자선" 등)을 최종 판단
-    private String getActualCourseTypeForUser(DetailedCourseInfo course, User currentUser, CreditSettingsRequest creditSettings) {
-        if (course == null || currentUser == null) {
-            logger.warn("getActualCourseTypeForUser 호출 시 course 또는 currentUser가 null입니다.");
-            return "기타";
-        }
+    public MainPageTimetableResponse getMainPageTimetable(Long userId) {
+        UserPreferenceEntity userPreferences = userService.getUserPreference(userId);
+        String savedTimetableJson = userPreferences.getSavedTimetableJson();
 
-        String primaryMajorName = currentUser.getMajor(); // User 클래스의 getter 사용
-        String secondaryMajorName = currentUser.getDoubleMajor(); // User 클래스의 getter 사용
-        String courseSpecificMajor = course.getSpecificMajor();
-        String courseDeptOriginal = course.getDepartmentOriginal();
-        String courseGeneralizedType = course.getGeneralizedType();
-        if (courseGeneralizedType == null) {
-            courseGeneralizedType = courseDataService.determineInitialGeneralizedType(courseDeptOriginal);
-        }
-
-        // 1. 이중전공 판단
-        if (secondaryMajorName != null && !secondaryMajorName.isBlank() &&
-                courseSpecificMajor != null && !courseSpecificMajor.isBlank() &&
-                courseSpecificMajor.equalsIgnoreCase(secondaryMajorName)) {
-            return "이중전공";
-        }
-
-        // 2. 주전공 판단
-        if (primaryMajorName != null && !primaryMajorName.isBlank() &&
-                courseSpecificMajor != null && !courseSpecificMajor.isBlank() &&
-                courseSpecificMajor.equalsIgnoreCase(primaryMajorName)) {
-            return "전공";
-        }
-
-        // 3. "자선" 과목 판단
-        if (courseDeptOriginal != null && courseDeptOriginal.equalsIgnoreCase("전공")) {
-            return "자선";
-        }
-
-        // 4. 그 외
-        if (Objects.equals(courseGeneralizedType, "전공_후보")) {
-            if (primaryMajorName != null && !primaryMajorName.isBlank() &&
-                    courseDeptOriginal != null && courseDeptOriginal.toLowerCase().contains(primaryMajorName.toLowerCase())) {
-                return "전공";
+        // 1. 저장된 시간표가 있는지 확인
+        if (savedTimetableJson != null && !savedTimetableJson.isEmpty()) {
+            try {
+                // 2. JSON 문자열을 RecommendedTimetableDto 객체로 변환
+                RecommendedTimetableDto savedTimetable = objectMapper.readValue(savedTimetableJson, RecommendedTimetableDto.class);
+                logger.info("User ID {}: 저장된 시간표를 불러옵니다.", userId);
+                return new MainPageTimetableResponse(true, savedTimetable, "저장된 시간표입니다.");
+            } catch (JsonProcessingException e) {
+                logger.error("User ID {}: 저장된 시간표 JSON 파싱 중 오류 발생", userId, e);
+                // 파싱 실패 시, 시간표가 없는 것처럼 처리
             }
-            if (secondaryMajorName != null && !secondaryMajorName.isBlank() &&
-                    courseDeptOriginal != null && courseDeptOriginal.toLowerCase().contains(secondaryMajorName.toLowerCase())) {
-                return "이중전공";
-            }
-            return "일반선택";
         }
 
-        if (courseGeneralizedType != null &&
-                !courseGeneralizedType.equals("미분류_전공성") &&
-                !courseGeneralizedType.equals("기타")) {
-            return courseGeneralizedType;
-        }
-
-        return "기타";
+        // 3. 저장된 시간표가 없으면, 없다는 메시지 반환
+        logger.info("User ID {}: 저장된 시간표가 없습니다.", userId);
+        return new MainPageTimetableResponse(false, null, "아직 생성된 시간표가 없어요! 시간표를 생성하러 가볼까요?");
     }
 
-    private List<DetailedCourseInfo> prepareCandidateCourses(List<DetailedCourseInfo> allCourses,
-                                                             UserCourseSelectionEntity selections,
-                                                             int userGrade, // User 엔티티의 grade는 int
-                                                             User currentUser,
-                                                             CreditSettingsRequest creditSettings) {
-        Set<String> takenCourseGroupIds = new HashSet<>();
-        Set<String> retakeCourseGroupIds = new HashSet<>();
-
-        if (selections.getRetakeCourses() != null) {
-            for (String retakeCode : selections.getRetakeCourses()) {
-                DetailedCourseInfo retakeCourse = courseDataService.getDetailedCourseByCode(retakeCode);
-                if (retakeCourse != null && retakeCourse.getGroupId() != null) {
-                    retakeCourseGroupIds.add(retakeCourse.getGroupId());
-                } else if (retakeCourse != null) {
-                    retakeCourseGroupIds.add(retakeCourse.getCourseCode());
-                }
-            }
-        }
-
-        if (selections.getTakenCourses() != null) {
-            for (String takenCode : selections.getTakenCourses()) {
-                DetailedCourseInfo takenCourse = courseDataService.getDetailedCourseByCode(takenCode);
-                if (takenCourse != null && takenCourse.getGroupId() != null) {
-                    if (!retakeCourseGroupIds.contains(takenCourse.getGroupId())) {
-                        takenCourseGroupIds.add(takenCourse.getGroupId());
-                    }
-                } else if (takenCourse != null) {
-                    if (!retakeCourseGroupIds.contains(takenCourse.getCourseCode())) {
-                        takenCourseGroupIds.add(takenCourse.getCourseCode());
-                    }
-                }
-            }
-        }
-
-        return allCourses.stream()
-                .filter(course -> {
-                    String currentCourseIdentifier = course.getGroupId() != null ? course.getGroupId() : course.getCourseCode();
-                    return !takenCourseGroupIds.contains(currentCourseIdentifier) || retakeCourseGroupIds.contains(currentCourseIdentifier);
-                })
-                // 학년 필터링은 추천 알고리즘 내 우선순위 정렬로 처리 (이전 사용자 요청)
-                .collect(Collectors.toList());
-    }
-
-    public List<RecommendedTimetableDto> generateRecommendations(Long userId) { // userId는 Long
+    public List<RecommendedTimetableDto> generateRecommendations(Long userId) {
         logger.info("User ID {} 시간표 추천 생성 시작", userId);
-        User currentUser = userService.getUserDetails(userId); // User 타입으로 받음
+        User currentUser = userService.getUserDetails(userId);
         UserCourseSelectionEntity userSelections = userService.getUserCourseSelection(userId);
         UserPreferenceEntity userPreferences = userService.getUserPreference(userId);
 
         TimePreferenceRequest timePreferences = Optional.ofNullable(userPreferences.getTimePreferences()).orElseGet(TimePreferenceRequest::new);
         CreditSettingsRequest creditSettings = Optional.ofNullable(userPreferences.getCreditSettings()).orElseGet(CreditSettingsRequest::new);
 
-        List<String> targetCourseTypes = new ArrayList<>();
-        if (creditSettings.getCreditGoalsPerType() != null && !creditSettings.getCreditGoalsPerType().isEmpty()) {
-            targetCourseTypes.addAll(creditSettings.getCreditGoalsPerType().keySet());
-        }
+        List<String> targetCourseTypes = creditSettings.getCreditGoalsPerType() != null ?
+                new ArrayList<>(creditSettings.getCreditGoalsPerType().keySet()) : Collections.emptyList();
 
-        logger.debug("User ID {}: 사용자 정보(학년 {}): {}, 수강선택: {}, 시간선호: {}, 학점설정: {}, 목표유형: {}",
-                userId, currentUser.getGrade(), currentUser.getStudentId(), userSelections, timePreferences, creditSettings, targetCourseTypes); // currentUser.getStudentId() 등으로 변경 가능
+        logger.debug("User ID {}: 사용자 정보(학년 {}), 목표 학점 유형: {}", userId, currentUser.getGrade(), targetCourseTypes);
 
         List<DetailedCourseInfo> allCourses = courseDataService.getDetailedCourses();
         if (allCourses.isEmpty()) {
             logger.warn("User ID {}: 로드된 강의 데이터가 없습니다.", userId);
             return Collections.emptyList();
         }
-        logger.debug("User ID {}: 전체 강의 수: {}", userId, allCourses.size());
 
-        List<DetailedCourseInfo> candidatePool = prepareCandidateCourses(allCourses, userSelections, currentUser.getGrade(), currentUser, creditSettings); // grade는 int
-        logger.debug("User ID {}: 초기 후보 강의 수 (기수강/동일과목 제외): {}", userId, candidatePool.size());
+        List<DetailedCourseInfo> candidatePool = prepareCandidateCourses(allCourses, userSelections);
+        logger.debug("User ID {}: 기수강/재수강 필터 후 후보 강의 수: {}", userId, candidatePool.size());
 
-        List<DetailedCourseInfo> mandatoryScheduledCourses = getAndValidateMandatoryCourses(candidatePool, userSelections, currentUser, creditSettings);
-        if (mandatoryScheduledCourses == null) {
-            logger.error("User ID {}: 필수/재수강 과목 간 시간 중복으로 추천 생성 불가.", userId);
-            throw new IllegalArgumentException("필수 또는 재수강 과목 간에 시간이 중복됩니다. 선택을 조정한 후 다시 시도해주세요.");
-        }
+        List<DetailedCourseInfo> mandatoryScheduledCourses = getAndValidateMandatoryCourses(candidatePool, userSelections, currentUser);
         logger.info("User ID {}: 필수/재수강 과목 처리 완료 ({}개)", userId, mandatoryScheduledCourses.size());
-        mandatoryScheduledCourses.forEach(c -> logger.debug("  User ID {}: 필수/재수강 포함: {} ({}) - 실제유형: {}", userId, c.getCourseName(), c.getCourseCode(), getActualCourseTypeForUser(c, currentUser, creditSettings)));
 
         List<List<DetailedCourseInfo>> generatedRawTimetables = findTimetableCombinations(
                 mandatoryScheduledCourses, candidatePool,
-                timePreferences, creditSettings, 3, currentUser, targetCourseTypes
+                timePreferences, creditSettings, MAX_RECOMMENDATIONS, currentUser, targetCourseTypes
         );
         logger.info("User ID {}: {}개의 원시 시간표 조합 생성됨.", userId, generatedRawTimetables.size());
 
         List<RecommendedTimetableDto> recommendations = new ArrayList<>();
         for (int i = 0; i < generatedRawTimetables.size(); i++) {
             List<DetailedCourseInfo> timetableCourses = generatedRawTimetables.get(i);
-            Map<String, Integer> creditsByType = calculateCreditsByTypeForUser(timetableCourses, currentUser, creditSettings, targetCourseTypes);
+            Map<String, Integer> creditsByType = calculateCreditsByTypeForUser(timetableCourses, currentUser, creditSettings);
             int totalCredits = creditsByType.values().stream().mapToInt(Integer::intValue).sum();
             recommendations.add(convertToRecommendedDtoForUser(i + 1, timetableCourses, creditsByType, totalCredits, currentUser, creditSettings));
         }
 
+        // 필수 과목만으로도 조건 충족 시 추천 목록에 추가
         if (recommendations.isEmpty() && !mandatoryScheduledCourses.isEmpty()) {
-            if (meetsAllCreditCriteriaForUser(mandatoryScheduledCourses, currentUser, creditSettings, targetCourseTypes)) {
-                Map<String, Integer> mandatoryCreditsByType = calculateCreditsByTypeForUser(mandatoryScheduledCourses, currentUser, creditSettings, targetCourseTypes);
+            if (meetsAllCreditCriteria(mandatoryScheduledCourses, creditSettings, currentUser)) {
+                Map<String, Integer> mandatoryCreditsByType = calculateCreditsByTypeForUser(mandatoryScheduledCourses, currentUser, creditSettings);
                 int mandatoryTotalCredits = mandatoryCreditsByType.values().stream().mapToInt(Integer::intValue).sum();
                 recommendations.add(convertToRecommendedDtoForUser(0, mandatoryScheduledCourses, mandatoryCreditsByType, mandatoryTotalCredits, currentUser, creditSettings));
                 logger.info("User ID {}: 필수 과목만으로 구성된 시간표를 추천합니다.", userId);
@@ -187,55 +107,60 @@ public class TimetableService {
         }
 
         if (recommendations.isEmpty()) {
-            logger.info("User ID {}: 최종 추천 시간표를 생성하지 못했습니다.", userId);
+            logger.warn("User ID {}: 최종 추천 시간표를 생성하지 못했습니다.", userId);
         } else {
             logger.info("User ID {}: 최종 {}개의 시간표 추천.", userId, recommendations.size());
         }
+
         return recommendations;
     }
 
-    private List<DetailedCourseInfo> filterByTimePreferences(List<DetailedCourseInfo> courses, TimePreferenceRequest preferences) {
-        // 1. 사용자가 선호 시간대를 아예 설정하지 않았다면, 모든 과목을 그대로 반환합니다.
-        if (preferences == null || preferences.getPreferredTimeSlots() == null || preferences.getPreferredTimeSlots().isEmpty()) {
-            return courses;
-        }
+    private List<DetailedCourseInfo> prepareCandidateCourses(List<DetailedCourseInfo> allCourses, UserCourseSelectionEntity selections) {
+        Set<String> takenGroupIds = selections.getTakenCourses().stream()
+                .map(courseDataService::getDetailedCourseByCode)
+                .filter(Objects::nonNull)
+                .map(c -> c.getGroupId() != null ? c.getGroupId() : c.getCourseCode())
+                .collect(Collectors.toSet());
 
-        // 2. 사용자가 선택한 모든 선호 시간대를 '허용된 시간 지도'로 만듭니다.
-        //    예: { "Mon": {1, 2, 3, 4}, "Wed": {3, 4} }
-        Map<String, Set<Integer>> allowedSlotsMap = new HashMap<>();
-        for (TimeSlotDto preferredSlot : preferences.getPreferredTimeSlots()) {
-            if (preferredSlot.getDay() != null && preferredSlot.getPeriods() != null) {
-                allowedSlotsMap
-                        .computeIfAbsent(preferredSlot.getDay(), k -> new HashSet<>())
-                        .addAll(preferredSlot.getPeriods());
-            }
-        }
+        Set<String> retakeCodes = new HashSet<>(selections.getRetakeCourses());
 
-        // 3. 전체 과목 목록에서, '허용된 시간 지도' 안에 완전히 포함되는 과목만 남깁니다.
-        return courses.stream().filter(course -> {
-            // 강의에 시간 정보가 없으면 추천 대상에서 제외합니다.
-            if (course.getScheduleSlots() == null || course.getScheduleSlots().isEmpty()) {
-                return false;
-            }
-
-            // 해당 과목의 '모든' 수업 시간이 '허용된 시간 지도'에 포함되어야 합니다.
-            for (TimeSlotDto courseSlot : course.getScheduleSlots()) {
-                Set<Integer> allowedPeriods = allowedSlotsMap.get(courseSlot.getDay());
-                // 해당 요일에 허용된 시간이 없거나(null),
-                // 과목의 교시들 중 허용되지 않은 교시가 하나라도 있다면(!containsAll) 이 과목은 탈락입니다.
-                if (allowedPeriods == null || !allowedPeriods.containsAll(courseSlot.getPeriods())) {
-                    return false;
-                }
-            }
-            // 모든 시간 검사를 통과한 과목만 살아남습니다.
-            return true;
-        }).collect(Collectors.toList());
+        return allCourses.stream()
+                .filter(course -> {
+                    String identifier = course.getGroupId() != null ? course.getGroupId() : course.getCourseCode();
+                    return retakeCodes.contains(course.getCourseCode()) || !takenGroupIds.contains(identifier);
+                })
+                .collect(Collectors.toList());
     }
 
+    private List<DetailedCourseInfo> getAndValidateMandatoryCourses(List<DetailedCourseInfo> candidatePool,
+                                                                    UserCourseSelectionEntity selections,
+                                                                    User currentUser) {
+        Set<String> mandatoryCodes = new HashSet<>(selections.getMandatoryCourses());
+        mandatoryCodes.addAll(selections.getRetakeCourses());
 
-    // TimetableService.java 내부에 위치
+        if (mandatoryCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-    // TimetableService.java 내부에 위치
+        List<DetailedCourseInfo> mandatoryCourses = candidatePool.stream()
+                .filter(c -> mandatoryCodes.contains(c.getCourseCode()))
+                .collect(Collectors.toMap(
+                        c -> c.getGroupId() != null ? c.getGroupId() : c.getCourseCode(),
+                        c -> c,
+                        (existing, replacement) -> existing
+                )).values().stream().toList();
+
+        if (hasTimeConflictInList(mandatoryCourses)) {
+            String conflictingCourses = mandatoryCourses.stream()
+                    .map(c -> c.getCourseName() + "(" + c.getCourseCode() + ")")
+                    .collect(Collectors.joining(", "));
+            logger.error("User ID {}: 필수/재수강 과목 간 시간 중복 발생: {}", currentUser.getId(), conflictingCourses);
+            throw new MandatoryCourseConflictException("필수/재수강 과목 간 시간이 중복됩니다: " + conflictingCourses);
+        }
+        return mandatoryCourses;
+    }
+
+    // ================== 핵심 수정 영역: 분할 정복 알고리즘 ==================
 
     private List<List<DetailedCourseInfo>> findTimetableCombinations(
             List<DetailedCourseInfo> initialTimetableBase,
@@ -246,325 +171,240 @@ public class TimetableService {
             User currentUser,
             List<String> targetCourseTypes) {
 
-        List<List<DetailedCourseInfo>> validTimetables = new ArrayList<>();
-        List<DetailedCourseInfo> currentCombination = new ArrayList<>(initialTimetableBase);
+        logger.debug("User ID {}: 조합 탐색 시작. 초기 과목 {}개.", currentUser.getId(), initialTimetableBase.size());
 
-        Set<String> initialCourseGroupIds = initialTimetableBase.stream()
-                .map(DetailedCourseInfo::getGroupId)
-                .filter(Objects::nonNull)
+        // 1. [최적화] 가장 큰 풀에 대해 선호도 필터링을 '먼저', '한 번만' 수행
+        List<DetailedCourseInfo> timeFilteredPool = filterByTimePreferences(availableCoursePool, timePreferences);
+        logger.debug("User ID {}: 선호 시간 필터링 후 후보 강의 수: {}", currentUser.getId(), timeFilteredPool.size());
+
+        Set<String> initialCourseIdentifiers = initialTimetableBase.stream()
+                .map(c -> c.getGroupId() != null ? c.getGroupId() : c.getCourseCode())
                 .collect(Collectors.toSet());
 
-        // 1. 시간 선호도에 맞는 과목만 먼저 걸러냅니다.
-        List<DetailedCourseInfo> timeFilteredPool = filterByTimePreferences(availableCoursePool, timePreferences);
-
-        // 2. 그 결과 중에서 추가적인 필터링을 수행합니다.
-        List<DetailedCourseInfo> electivePool = timeFilteredPool.stream()
-                // 필수/재수강으로 이미 선택된 동일계열 과목 제외
-                .filter(c -> c.getGroupId() == null || !initialCourseGroupIds.contains(c.getGroupId()))
-
-                // ★★★ 핵심 성능 개선 필터 ★★★
-                .filter(course -> {
-                    // 사용자가 학점 목표를 설정한 유형이 없다면 모든 과목을 대상으로 함
-                    if (targetCourseTypes.isEmpty()) {
-                        return true;
-                    }
-
-                    // 과목의 실제 유형을 판단
-                    String actualType = getActualCourseTypeForUser(course, currentUser, creditSettings);
-
-                    // 사용자가 목표를 설정한 유형의 과목이거나, "자선" 또는 "일반선택" 과목만 후보로 인정
-                    return targetCourseTypes.contains(actualType) || "자선".equals(actualType) || "일반선택".equals(actualType);
+        // 2. [최적화] 대폭 줄어든 풀을 기반으로, 유형별 선택과목 풀 생성
+        Map<String, List<DetailedCourseInfo>> electivesByType = timeFilteredPool.stream()
+                .filter(c -> {
+                    // 필수/재수강으로 이미 선택된 과목 및 동일 그룹 과목 제외
+                    String identifier = c.getGroupId() != null ? c.getGroupId() : c.getCourseCode();
+                    return !initialCourseIdentifiers.contains(identifier);
                 })
-                .collect(Collectors.toList());
+                .collect(Collectors.groupingBy(course -> getActualCourseTypeForUser(course, currentUser, creditSettings)));
 
-        logger.debug("User ID {}: 초기 조합 ({}개), 최종 필터링된 선택 가능 풀 ({}개)",
-                currentUser.getId(),
-                currentCombination.size(),
-                electivePool.size()
-        );
+        // 3. [분할] 각 목표 유형별로 학점 조건을 만족하는 '부분 조합' 리스트를 미리 계산
+        Map<String, List<List<DetailedCourseInfo>>> combinationsByType = new HashMap<>();
+        for (String type : targetCourseTypes) {
+            CreditRangeDto range = creditSettings.getCreditGoalsPerType().get(type);
+            if (range == null || range.getMax() <= 0) continue;
 
-        // 이제 대폭 줄어든 electivePool을 가지고 조합을 시작합니다.
-        generateCombinationsRecursive(
-                electivePool, 0, currentCombination, validTimetables, timePreferences,
-                creditSettings, numRecommendationsNeeded, currentUser, targetCourseTypes
-        );
+            List<DetailedCourseInfo> typePool = electivesByType.getOrDefault(type, Collections.emptyList());
+            List<List<DetailedCourseInfo>> typeCombinations = findCombinationsForType(typePool, range);
 
-        return validTimetables.stream().limit(numRecommendationsNeeded).collect(Collectors.toList());
+            // 해당 유형의 조합이 필수적인데 생성되지 않았다면, 더 이상 진행 불가
+            if (range.getMin() > 0 && typeCombinations.isEmpty()) {
+                logger.warn("User ID {}: 필수 요건인 '{}' 유형 (최소 {}학점) 과목 조합을 생성할 수 없어 시간표 추천이 불가능합니다.", currentUser.getId(), type, range.getMin());
+                return Collections.emptyList();
+            }
+            combinationsByType.put(type, typeCombinations);
+        }
+
+        // 4. [정복] 생성된 부분 조합들을 재귀적으로 결합하여 최종 시간표 완성
+        List<List<DetailedCourseInfo>> finalTimetables = new ArrayList<>();
+        combineTypeCombinationsRecursive(
+                targetCourseTypes, 0, initialTimetableBase, combinationsByType,
+                finalTimetables, creditSettings, numRecommendationsNeeded, currentUser);
+
+        return finalTimetables;
     }
 
-    private void generateCombinationsRecursive(
-            List<DetailedCourseInfo> electives, int startIndex,
-            List<DetailedCourseInfo> currentCombination,
-            List<List<DetailedCourseInfo>> validTimetables,
-            TimePreferenceRequest timePreferences,
-            CreditSettingsRequest creditSettings,
-            int numRecommendationsNeeded,
-            User currentUser,
-            List<String> targetCourseTypes) {
+    private List<List<DetailedCourseInfo>> findCombinationsForType(List<DetailedCourseInfo> typePool, CreditRangeDto range) {
+        List<List<DetailedCourseInfo>> result = new ArrayList<>();
+        findCombinationsForTypeRecursive(typePool, range, 0, new ArrayList<>(), 0, result);
+        return result;
+    }
 
-        if (validTimetables.size() >= numRecommendationsNeeded) {
+    private void findCombinationsForTypeRecursive(List<DetailedCourseInfo> pool, CreditRangeDto range, int startIndex,
+                                                  List<DetailedCourseInfo> currentCombination, int currentCredits, List<List<DetailedCourseInfo>> result) {
+        if (currentCredits >= range.getMin() && currentCredits <= range.getMax()) {
+            result.add(new ArrayList<>(currentCombination));
+        }
+
+        if (startIndex >= pool.size() || currentCredits >= range.getMax()) {
             return;
         }
 
-        Map<String, Integer> currentCreditsByType = calculateCreditsByTypeForUser(currentCombination, currentUser, creditSettings, targetCourseTypes);
-        int currentTotalCredits = currentCreditsByType.values().stream().mapToInt(Integer::intValue).sum();
+        for (int i = startIndex; i < pool.size(); i++) {
+            DetailedCourseInfo courseToAdd = pool.get(i);
+            if (currentCredits + courseToAdd.getCredits() > range.getMax()) continue;
 
-        // 1. 학점 조건만 만족하는지 확인합니다.
-        if (meetsAllCreditCriteriaForUser(currentCombination, currentUser, creditSettings, targetCourseTypes)) {
-
-            // 이미 선호 시간에 맞는 과목들만 넘어왔기 때문에, 이 검사는 더 이상 필요 없습니다.
-            Set<String> currentCombinationGroupIds = currentCombination.stream()
-                    .map(DetailedCourseInfo::getGroupId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-
-            boolean isDuplicate = validTimetables.stream()
-                    .anyMatch(existing -> existing.stream().map(DetailedCourseInfo::getGroupId)
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toSet())
-                            .equals(currentCombinationGroupIds) && existing.size() == currentCombination.size());
-
-            if (!isDuplicate) {
-                validTimetables.add(new ArrayList<>(currentCombination));
-                logger.info("User ID {}: 유효한 시간표 발견! (현재 {}개 찾음) 과목: [{}], 총학점: {}",
-                        currentUser.getId(), validTimetables.size(),
-                        currentCombination.stream().map(DetailedCourseInfo::getCourseName).collect(Collectors.joining(", ")),
-                        currentTotalCredits);
-                if (validTimetables.size() >= numRecommendationsNeeded) return;
+            currentCombination.add(courseToAdd);
+            if (!hasTimeConflictInList(currentCombination)) {
+                findCombinationsForTypeRecursive(pool, range, i + 1, currentCombination, currentCredits + courseToAdd.getCredits(), result);
             }
+            currentCombination.remove(currentCombination.size() - 1);
         }
+    }
 
-        if (startIndex >= electives.size() ||
-                (creditSettings.getMaxTotalCredits() != null && currentTotalCredits >= creditSettings.getMaxTotalCredits())) {
+    private void combineTypeCombinationsRecursive(List<String> targetTypes, int typeIndex,
+                                                  List<DetailedCourseInfo> currentTimetable,
+                                                  Map<String, List<List<DetailedCourseInfo>>> combinationsByType,
+                                                  List<List<DetailedCourseInfo>> finalResult,
+                                                  CreditSettingsRequest creditSettings, int numRecommendationsNeeded,
+                                                  User currentUser) {
+        if (finalResult.size() >= numRecommendationsNeeded) {
             return;
         }
 
-        for (int i = startIndex; i < electives.size(); i++) {
-            DetailedCourseInfo courseToAdd = electives.get(i);
-
-            if (courseToAdd.getGroupId() != null) {
-                final String currentGroupId = courseToAdd.getGroupId();
-                boolean groupAlreadyInCombination = currentCombination.stream()
-                        .anyMatch(existingCourse -> Objects.equals(existingCourse.getGroupId(), currentGroupId));
-                if (groupAlreadyInCombination) {
-                    continue;
-                }
+        if (typeIndex >= targetTypes.size()) {
+            if (meetsAllCreditCriteria(currentTimetable, creditSettings, currentUser)) {
+                finalResult.add(new ArrayList<>(currentTimetable));
             }
+            return;
+        }
 
-            String actualCourseType = getActualCourseTypeForUser(courseToAdd, currentUser, creditSettings);
-            if (!targetCourseTypes.isEmpty()) {
-                if (!targetCourseTypes.contains(actualCourseType) &&
-                        !"기타".equals(actualCourseType) && !"일반선택".equals(actualCourseType)) {
-                    logger.trace("User ID {}: 과목 {} ({})은 사용자가 학점 목표를 설정한 유형({})에 없어 건너뜀", currentUser.getId(), courseToAdd.getCourseName(), actualCourseType, targetCourseTypes);
-                    continue;
-                }
-            }
+        String currentType = targetTypes.get(typeIndex);
+        List<List<DetailedCourseInfo>> partialCombinations = combinationsByType.get(currentType);
 
-            if (canAddCourseCreditWiseForUser(courseToAdd, currentCreditsByType, currentTotalCredits, creditSettings, currentUser, targetCourseTypes)) {
-                currentCombination.add(courseToAdd);
-                if (!hasTimeConflictInList(currentCombination)) {
-                    logger.trace("User ID {}: 과목 추가 시도: {}, 현재 조합: [{}], (총 {}학점)", currentUser.getId(), courseToAdd.getCourseName(), currentCombination.stream().map(DetailedCourseInfo::getCourseName).collect(Collectors.joining(", ")), currentTotalCredits + courseToAdd.getCredits());
-                    generateCombinationsRecursive(electives, i + 1, currentCombination, validTimetables, timePreferences, creditSettings, numRecommendationsNeeded, currentUser, targetCourseTypes);
-                } else {
-                    logger.trace("User ID {}: 과목 {} 추가 시 시간 충돌 발생", currentUser.getId(), courseToAdd.getCourseName());
-                }
-                currentCombination.remove(currentCombination.size() - 1);
-            } else {
-                logger.trace("User ID {}: 과목 {} 추가 시 학점 조건 위반", currentUser.getId(), courseToAdd.getCourseName());
+        // 해당 유형의 조합이 없거나 필수적이지 않다면(min=0), 바로 다음 유형으로 넘어감
+        CreditRangeDto range = creditSettings.getCreditGoalsPerType().get(currentType);
+        if (partialCombinations == null || partialCombinations.isEmpty()) {
+            if (range != null && range.getMin() == 0) {
+                combineTypeCombinationsRecursive(targetTypes, typeIndex + 1, currentTimetable, combinationsByType, finalResult, creditSettings, numRecommendationsNeeded, currentUser);
             }
-            if (validTimetables.size() >= numRecommendationsNeeded) return;
+            return;
+        }
+
+        for (List<DetailedCourseInfo> partial : partialCombinations) {
+            if (finalResult.size() >= numRecommendationsNeeded) return;
+
+            List<DetailedCourseInfo> nextTimetable = new ArrayList<>(currentTimetable);
+            nextTimetable.addAll(partial);
+            if (!hasTimeConflictInList(nextTimetable)) {
+                combineTypeCombinationsRecursive(targetTypes, typeIndex + 1, nextTimetable, combinationsByType, finalResult, creditSettings, numRecommendationsNeeded, currentUser);
+            }
         }
     }
 
-    private int compareCourseGradePriority(DetailedCourseInfo c1, DetailedCourseInfo c2, int userNumericGrade) {
-        // (이전 답변과 동일)
-        int g1Priority = getGradePriorityValue(c1.getGrade(), userNumericGrade);
-        int g2Priority = getGradePriorityValue(c2.getGrade(), userNumericGrade);
-        return Integer.compare(g1Priority, g2Priority);
+    // ================== 유틸리티 및 헬퍼 메서드 ==================
+
+    private boolean meetsAllCreditCriteria(List<DetailedCourseInfo> timetable, CreditSettingsRequest settings, User user) {
+        if (timetable.isEmpty()) {
+            return !(settings.getMinTotalCredits() != null && settings.getMinTotalCredits() > 0);
+        }
+
+        Map<String, Integer> creditsByType = calculateCreditsByTypeForUser(timetable, user, settings);
+        int totalCredits = creditsByType.values().stream().mapToInt(Integer::intValue).sum();
+
+        if (settings.getMinTotalCredits() != null && totalCredits < settings.getMinTotalCredits()) return false;
+        if (settings.getMaxTotalCredits() != null && totalCredits > settings.getMaxTotalCredits()) return false;
+
+        if (settings.getCreditGoalsPerType() != null) {
+            for (Map.Entry<String, CreditRangeDto> entry : settings.getCreditGoalsPerType().entrySet()) {
+                String type = entry.getKey();
+                CreditRangeDto range = entry.getValue();
+                int creditsForType = creditsByType.getOrDefault(type, 0);
+                if (creditsForType < range.getMin() || creditsForType > range.getMax()) return false;
+            }
+        }
+        return true;
     }
 
-    private int getGradePriorityValue(String courseGradeStr, int userNumericGrade) {
-        // (이전 답변과 동일)
-        if (courseGradeStr == null || courseGradeStr.equalsIgnoreCase("정보없음")) return 1000;
-        try {
-            String numericOnlyCourseGrade = courseGradeStr.replaceAll("[^0-9]", "");
-            if (!numericOnlyCourseGrade.isEmpty()) {
-                int cGrade = Integer.parseInt(numericOnlyCourseGrade);
-                if (cGrade == userNumericGrade) return 0;
-                return Math.abs(cGrade - userNumericGrade);
+    private Map<String, Integer> calculateCreditsByTypeForUser(List<DetailedCourseInfo> courses, User currentUser, CreditSettingsRequest creditSettings) {
+        Map<String, Integer> creditsMap = new HashMap<>();
+        if (creditSettings.getCreditGoalsPerType() != null) {
+            creditSettings.getCreditGoalsPerType().keySet().forEach(type -> creditsMap.put(type, 0));
+        }
+
+        for (DetailedCourseInfo course : courses) {
+            String actualCourseType = getActualCourseTypeForUser(course, currentUser, creditSettings);
+            creditsMap.put(actualCourseType, creditsMap.getOrDefault(actualCourseType, 0) + course.getCredits());
+        }
+        return creditsMap;
+    }
+
+    private List<DetailedCourseInfo> filterByTimePreferences(List<DetailedCourseInfo> courses, TimePreferenceRequest preferences) {
+        if (preferences == null || preferences.getPreferredTimeSlots() == null || preferences.getPreferredTimeSlots().isEmpty()) {
+            return courses;
+        }
+
+        Map<String, Set<Integer>> allowedSlotsMap = new HashMap<>();
+        for (TimeSlotDto preferredSlot : preferences.getPreferredTimeSlots()) {
+            allowedSlotsMap
+                    .computeIfAbsent(preferredSlot.getDay(), k -> new HashSet<>())
+                    .addAll(preferredSlot.getPeriods());
+        }
+
+        return courses.stream().filter(course -> {
+            if (course.getScheduleSlots() == null || course.getScheduleSlots().isEmpty()) return false;
+            for (TimeSlotDto courseSlot : course.getScheduleSlots()) {
+                Set<Integer> allowedPeriods = allowedSlotsMap.get(courseSlot.getDay());
+                if (allowedPeriods == null || !allowedPeriods.containsAll(courseSlot.getPeriods())) {
+                    return false;
+                }
             }
-        } catch (NumberFormatException e) { /* 무시 */ }
-        return 1000;
+            return true;
+        }).collect(Collectors.toList());
     }
 
     private boolean hasTimeConflictInList(List<DetailedCourseInfo> courses) {
-        // (이전 답변과 동일, 로깅 강화)
-        if (courses == null || courses.isEmpty()) return false;
-        List<TimeSlotDto> allSlots = courses.stream()
-                .filter(c -> c.getScheduleSlots() != null && !c.getScheduleSlots().isEmpty())
-                .flatMap(course -> course.getScheduleSlots().stream())
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-
-        if (allSlots.isEmpty()) return false;
-
-        Map<String, Set<Integer>> dailySchedule = new HashMap<>();
-        for (TimeSlotDto slot : allSlots) {
-            if (slot.getDay() == null || slot.getPeriods() == null || slot.getPeriods().isEmpty()) continue;
-
-            Set<Integer> periodsForDay = dailySchedule.computeIfAbsent(slot.getDay(), k -> new HashSet<>());
-            for (Integer period : slot.getPeriods()) {
-                if (!periodsForDay.add(period)) {
-                    logger.debug("시간 충돌 감지: Day={}, Period={}, 충돌 유발 과목들: {}", slot.getDay(), period,
-                            courses.stream()
-                                    .filter(c-> c.getScheduleSlots() != null && c.getScheduleSlots().stream()
-                                            .anyMatch(s-> Objects.equals(s.getDay(), slot.getDay()) && s.getPeriods() != null && s.getPeriods().contains(period)))
-                                    .map(c -> c.getCourseName() + "(" + c.getCourseCode() + ")")
-                                    .collect(Collectors.toList()));
-                    return true;
+        if (courses.size() < 2) return false;
+        Map<String, BitSet> schedule = new HashMap<>();
+        for (DetailedCourseInfo course : courses) {
+            if (course.getScheduleSlots() == null) continue;
+            for (TimeSlotDto slot : course.getScheduleSlots()) {
+                BitSet daySchedule = schedule.computeIfAbsent(slot.getDay(), k -> new BitSet(16));
+                for (int period : slot.getPeriods()) {
+                    if (daySchedule.get(period)) {
+                        return true;
+                    }
+                    daySchedule.set(period);
                 }
             }
         }
         return false;
     }
 
-    private List<DetailedCourseInfo> getAndValidateMandatoryCourses(List<DetailedCourseInfo> candidatePool,
-                                                                    UserCourseSelectionEntity selections,
-                                                                    User currentUser,
-                                                                    CreditSettingsRequest creditSettings) {
-        Set<String> mandatoryAndRetakeCodesFromSelection = new HashSet<>();
-        if (selections.getMandatoryCourses() != null) mandatoryAndRetakeCodesFromSelection.addAll(selections.getMandatoryCourses());
-        if (selections.getRetakeCourses() != null) mandatoryAndRetakeCodesFromSelection.addAll(selections.getRetakeCourses());
-
-        if (mandatoryAndRetakeCodesFromSelection.isEmpty()) return Collections.emptyList();
-
-        List<DetailedCourseInfo> initialMandatoryCourses = candidatePool.stream()
-                .filter(course -> mandatoryAndRetakeCodesFromSelection.contains(course.getCourseCode()))
-                .distinct()
-                .collect(Collectors.toList());
-
-        Map<String, DetailedCourseInfo> mandatoryCoursesByGroupId = new LinkedHashMap<>();
-        for (DetailedCourseInfo course : initialMandatoryCourses) {
-            String identifier = course.getGroupId() != null ? course.getGroupId() : course.getCourseCode();
-            mandatoryCoursesByGroupId.putIfAbsent(identifier, course);
+    private String getActualCourseTypeForUser(DetailedCourseInfo course, User currentUser, CreditSettingsRequest creditSettings) {
+        if (course == null || currentUser == null) {
+            return "기타";
         }
-        List<DetailedCourseInfo> validatedMandatoryCourses = new ArrayList<>(mandatoryCoursesByGroupId.values());
-
-        // ★★★ 핵심 수정 부분 ★★★
-        if (hasTimeConflictInList(validatedMandatoryCourses)) {
-            // 시간이 중복되면, 어떤 과목들이 문제인지 메시지를 만들어 새로운 예외를 발생시킨다.
-            String conflictingCourses = validatedMandatoryCourses.stream()
-                    .map(c -> c.getCourseName() + "(" + c.getCourseCode() + ")")
-                    .collect(Collectors.joining(", "));
-            logger.error("User ID {}: 필수/재수강 과목 간 시간 중복 발생: {}", currentUser.getId(), conflictingCourses);
-            throw new MandatoryCourseConflictException("필수/재수강 과목 간 시간이 중복됩니다: " + conflictingCourses);
+        String primaryMajorName = currentUser.getMajor();
+        String secondaryMajorName = currentUser.getDoubleMajor();
+        String courseSpecificMajor = course.getSpecificMajor();
+        String courseDeptOriginal = course.getDepartmentOriginal();
+        String courseGeneralizedType = course.getGeneralizedType();
+        if (courseGeneralizedType == null) {
+            courseGeneralizedType = courseDataService.determineInitialGeneralizedType(courseDeptOriginal);
         }
-        return validatedMandatoryCourses;
-    }
-    private boolean canAddCourseCreditWiseForUser(DetailedCourseInfo courseToAdd,
-                                                  Map<String, Integer> currentCreditsByType,
-                                                  int currentTotalCredits,
-                                                  CreditSettingsRequest creditSettings,
-                                                  User currentUser, // User 타입으로 변경
-                                                  List<String> targetCourseTypes) {
 
-        String actualCourseType = getActualCourseTypeForUser(courseToAdd, currentUser, creditSettings);
-        int creditsOfCourseToAdd = courseToAdd.getCredits();
-
-        boolean isRelevantForCreditGoalCheck = targetCourseTypes.isEmpty() || targetCourseTypes.contains(actualCourseType) ||
-                "기타".equals(actualCourseType) || "일반선택".equals(actualCourseType);
-
-        int newCreditsForType = currentCreditsByType.getOrDefault(actualCourseType, 0) + creditsOfCourseToAdd;
-        int newTotalCredits = currentTotalCredits + creditsOfCourseToAdd;
-
-        Map<String, CreditRangeDto> rangesPerType = creditSettings.getCreditGoalsPerType();
-        if (rangesPerType != null && isRelevantForCreditGoalCheck && rangesPerType.containsKey(actualCourseType)) {
-            CreditRangeDto typeRange = rangesPerType.get(actualCourseType);
-            if (typeRange != null && newCreditsForType > typeRange.getMax()) {
-                logger.trace("과목 {} (유형:{}) 추가 시 {} 유형 최대 학점({}) 초과 (현재 {} + 추가 {} = {})", courseToAdd.getCourseName(), actualCourseType, actualCourseType, typeRange.getMax(), currentCreditsByType.getOrDefault(actualCourseType, 0), creditsOfCourseToAdd, newCreditsForType);
-                return false;
+        if (secondaryMajorName != null && !secondaryMajorName.isBlank() &&
+                courseSpecificMajor != null && courseSpecificMajor.equalsIgnoreCase(secondaryMajorName)) {
+            return "이중전공";
+        }
+        if (primaryMajorName != null && !primaryMajorName.isBlank() &&
+                courseSpecificMajor != null && courseSpecificMajor.equalsIgnoreCase(primaryMajorName)) {
+            return "전공";
+        }
+        if (courseDeptOriginal != null && courseDeptOriginal.equalsIgnoreCase("전공")) {
+            return "자선";
+        }
+        if (Objects.equals(courseGeneralizedType, "전공_후보")) {
+            if (primaryMajorName != null && !primaryMajorName.isBlank() && courseDeptOriginal != null && courseDeptOriginal.toLowerCase().contains(primaryMajorName.toLowerCase())) {
+                return "전공";
             }
-        }
-
-        if (creditSettings.getMaxTotalCredits() != null && newTotalCredits > creditSettings.getMaxTotalCredits()) {
-            logger.trace("과목 {} 추가 시 전체 최대 학점({}) 초과 (현재 {} + 추가 {} = {})", courseToAdd.getCourseName(), creditSettings.getMaxTotalCredits(), currentTotalCredits, creditsOfCourseToAdd, newTotalCredits);
-            return false;
-        }
-        return true;
-    }
-
-    private boolean meetsAllCreditCriteriaForUser(List<DetailedCourseInfo> timetable, User currentUser, CreditSettingsRequest creditSettings, List<String> targetCourseTypes) { // User 타입으로 변경
-        if (timetable.isEmpty()) {
-            return !(creditSettings.getMinTotalCredits() != null && creditSettings.getMinTotalCredits() > 0);
-        }
-
-        Map<String, Integer> currentCreditsByType = calculateCreditsByTypeForUser(timetable, currentUser, creditSettings, targetCourseTypes);
-        int currentTotalCredits = currentCreditsByType.values().stream().mapToInt(Integer::intValue).sum();
-
-        logger.trace("학점 조건 검사 - User ID {}: 총 학점: {}, 유형별 학점: {}", currentUser.getId(), currentTotalCredits, currentCreditsByType);
-
-        if (creditSettings.getMinTotalCredits() != null && currentTotalCredits < creditSettings.getMinTotalCredits()) {
-            logger.trace("  -> 전체 최소 학점({}) 미달", creditSettings.getMinTotalCredits());
-            return false;
-        }
-        if (creditSettings.getMaxTotalCredits() != null && currentTotalCredits > creditSettings.getMaxTotalCredits()) {
-            logger.trace("  -> 전체 최대 학점({}) 초과", creditSettings.getMaxTotalCredits());
-            return false;
-        }
-
-        if (!targetCourseTypes.isEmpty() && creditSettings.getCreditGoalsPerType() != null && !creditSettings.getCreditGoalsPerType().isEmpty()) {
-            for (String userDefinedType : targetCourseTypes) {
-                CreditRangeDto range = creditSettings.getCreditGoalsPerType().get(userDefinedType);
-                int creditsForThisType = currentCreditsByType.getOrDefault(userDefinedType, 0);
-                if (range != null) {
-                    if (creditsForThisType < range.getMin()) {
-                        logger.trace("  -> {} 유형 최소 학점({}) 미달 (현재 {})", userDefinedType, range.getMin(), creditsForThisType);
-                        return false;
-                    }
-                    if (creditsForThisType > range.getMax()) {
-                        logger.trace("  -> {} 유형 최대 학점({}) 초과 (현재 {})", userDefinedType, range.getMax(), creditsForThisType);
-                        return false;
-                    }
-                } else {
-                    logger.warn("  -> User ID {}: 사용자가 듣기로 한 유형 {} 에 대한 학점 범위 설정(CreditRangeDto)이 없습니다 (현재 {} 학점).", currentUser.getId(), userDefinedType, creditsForThisType);
-                }
+            if (secondaryMajorName != null && !secondaryMajorName.isBlank() && courseDeptOriginal != null && courseDeptOriginal.toLowerCase().contains(secondaryMajorName.toLowerCase())) {
+                return "이중전공";
             }
+            return "일반선택";
         }
-        logger.trace("  -> User ID {}: 모든 학점 조건 만족", currentUser.getId());
-        return true;
+
+        if(courseGeneralizedType != null && courseGeneralizedType.equals("교양")){
+            return "교양";
+        }
+
+        return "일반선택";
     }
 
-    private Map<String, Integer> calculateCreditsByTypeForUser(List<DetailedCourseInfo> courses, User currentUser, CreditSettingsRequest creditSettings, List<String> targetCourseTypes) { // User 타입으로 변경
-        Map<String, Integer> creditsMap = new HashMap<>();
-        List<String> typesToInitializeInMap = new ArrayList<>();
-
-        if (targetCourseTypes != null && !targetCourseTypes.isEmpty()){
-            typesToInitializeInMap.addAll(targetCourseTypes);
-        }
-
-        courses.stream()
-                .map(c -> getActualCourseTypeForUser(c, currentUser, creditSettings))
-                .filter(Objects::nonNull).distinct()
-                .forEach(type -> {
-                    if(!typesToInitializeInMap.contains(type)) typesToInitializeInMap.add(type);
-                });
-
-        typesToInitializeInMap.add("기타");
-        typesToInitializeInMap.add("일반선택");
-
-        for(String type : typesToInitializeInMap.stream().distinct().collect(Collectors.toList())) {
-            creditsMap.put(type, 0);
-        }
-
-        for (DetailedCourseInfo course : courses) {
-            String actualCourseType = getActualCourseTypeForUser(course, currentUser, creditSettings);
-            if (actualCourseType == null) actualCourseType = "기타";
-            creditsMap.put(actualCourseType, creditsMap.getOrDefault(actualCourseType, 0) + course.getCredits());
-        }
-        return creditsMap;
-    }
-
-    private RecommendedTimetableDto convertToRecommendedDtoForUser(int id, List<DetailedCourseInfo> courses, Map<String, Integer> creditsByType, int totalCredits, User currentUser, CreditSettingsRequest creditSettings) { // User 타입으로 변경
+    private RecommendedTimetableDto convertToRecommendedDtoForUser(int id, List<DetailedCourseInfo> courses, Map<String, Integer> creditsByType, int totalCredits, User currentUser, CreditSettingsRequest creditSettings) {
         List<ScheduledCourseDto> scheduledCourses = courses.stream()
                 .map(course -> new ScheduledCourseDto(
                         course.getCourseCode(),

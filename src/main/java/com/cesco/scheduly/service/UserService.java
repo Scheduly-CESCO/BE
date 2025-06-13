@@ -3,7 +3,9 @@ package com.cesco.scheduly.service;
 import com.cesco.scheduly.dto.course.PreferencesRequest;
 import com.cesco.scheduly.dto.timetable.CreditRangeDto;
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
+import com.cesco.scheduly.dto.timetable.RecommendedTimetableDto;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
+import com.cesco.scheduly.dto.user.MainPageInfoResponse;
 import com.cesco.scheduly.dto.user.MyPageResponse;
 import com.cesco.scheduly.dto.user.MyPageUpdateRequest;
 import com.cesco.scheduly.dto.user.SignupRequest;
@@ -19,6 +21,8 @@ import com.cesco.scheduly.repository.UserCourseSelectionRepository;
 import com.cesco.scheduly.repository.UserPreferenceRepository;
 import com.cesco.scheduly.repository.UserRepository;
 import com.cesco.scheduly.util.GraduationRequirementUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,17 +43,21 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserCourseSelectionRepository userCourseSelectionRepository;
     private final UserPreferenceRepository userPreferenceRepository;
+    private final ObjectMapper objectMapper; // JSON 변환을 위해 ObjectMapper 주입
+
     private final PasswordEncoder passwordEncoder;
 
     @Autowired
     public UserService(UserRepository userRepository,
                        UserCourseSelectionRepository userCourseSelectionRepository,
                        UserPreferenceRepository userPreferenceRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       ObjectMapper objectMapper) {
         this.userRepository = userRepository;
         this.userCourseSelectionRepository = userCourseSelectionRepository;
         this.userPreferenceRepository = userPreferenceRepository;
         this.passwordEncoder = passwordEncoder;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -122,6 +130,32 @@ public class UserService {
         logger.info("Initialized UserPreferenceEntity for user ID: {}", savedUser.getId());
 
         return savedUser;
+    }
+
+    @Transactional(readOnly = true)
+    public MainPageInfoResponse getMainPageInfo(Long userId) {
+        User user = getUserDetails(userId);
+        return new MainPageInfoResponse(
+                user.getName(),
+                user.getStudentId(),
+                user.getCollege(),
+                user.getMajor(),
+                user.getDoubleMajorType(),
+                user.getDoubleMajor()
+        );
+    }
+    @Transactional
+    public void saveTimetable(Long userId, RecommendedTimetableDto timetableDto) {
+        UserPreferenceEntity userPref = getUserPreference(userId);
+        try {
+            String timetableJson = objectMapper.writeValueAsString(timetableDto);
+            userPref.setSavedTimetableJson(timetableJson);
+            userPreferenceRepository.save(userPref);
+            logger.info("User ID {}: 시간표가 성공적으로 저장되었습니다.", userId);
+        } catch (JsonProcessingException e) {
+            logger.error("User ID {}: 시간표를 JSON으로 변환하는 중 오류 발생", userId, e);
+            throw new RuntimeException("시간표 저장 중 오류가 발생했습니다.");
+        }
     }
 
     @Transactional(readOnly = true)

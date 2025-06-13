@@ -1,16 +1,19 @@
 package com.cesco.scheduly.controller;
 
+import com.cesco.scheduly.dto.course.PreferencesRequest;
 import com.cesco.scheduly.dto.timetable.CreditRangeDto;
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
 import com.cesco.scheduly.dto.timetable.TimeSlotDto;
 import com.cesco.scheduly.entity.User;
+import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.enums.College;
 import com.cesco.scheduly.enums.DoubleMajorType;
 import com.cesco.scheduly.repository.UserCourseSelectionRepository;
 import com.cesco.scheduly.repository.UserPreferenceRepository;
 import com.cesco.scheduly.repository.UserRepository;
+import com.cesco.scheduly.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 
+import static org.hamcrest.Matchers.*;
 import static org.hamcrest.number.OrderingComparison.greaterThanOrEqualTo;
 import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -48,6 +52,9 @@ class TimetableControllerTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserService userService;
 
     @Autowired
     private UserCourseSelectionRepository userCourseSelectionRepository; // 자식 테이블 리포지토리 추가
@@ -236,4 +243,155 @@ class TimetableControllerTest {
                 .andExpect(status().isBadRequest()) // 400 Bad Request 상태 코드를 기대
                 .andExpect(jsonPath("$.message").value("유형별 최소 학점의 합(21)이 전체 최대 학점 목표(18)를 초과할 수 없습니다."));
     }
+
+    @Test
+    @WithMockUser
+    @DisplayName("분할정복 검증: 복잡한 학점 목표와 특정 요일 제외 후 시간표 추천 테스트")
+    void recommendsTimetable_WithComplexFilters_AndDayOffPreference() throws Exception {
+        // given: 1. 테스트 사용자 생성 (컴공/TESOL영어학 이중전공)
+        User complexUser = User.builder()
+                .studentId("20210815")
+                .name("복합조건테스터")
+                .passwordHash("password")
+                .college(College.공과대학)
+                .major("컴퓨터공학전공")
+                .doubleMajor("TESOL영어학전공") // 이중전공 설정
+                .doubleMajorType(DoubleMajorType.DOUBLE_MAJOR)
+                .grade(3)
+                .semester(1)
+                .build();
+        userRepository.save(complexUser);
+        Long userId = complexUser.getId();
+
+        UserPreferenceEntity preference = UserPreferenceEntity.builder().user(complexUser).build();
+        userPreferenceRepository.save(preference);
+        UserCourseSelectionEntity selection = UserCourseSelectionEntity.builder().user(complexUser).build();
+        userCourseSelectionRepository.save(selection);
+
+
+        // given: 2. 수강 정보 설정
+        PreferencesRequest coursePrefs = new PreferencesRequest();
+        coursePrefs.setCompleted_lectures(List.of("M01202101")); // 기수강: 자료구조와알고리즘 (추천 제외 대상)
+        coursePrefs.setRequired_lectures(List.of("V41009201"));  // 필수: 운영체제(3학점 전공) (반드시 포함)
+        userService.saveUserCourseSelections(userId, coursePrefs);
+
+        // given: 3. 시간 선호도 설정: "금요일은 공강일" 로 설정
+        TimePreferenceRequest timePrefs = new TimePreferenceRequest();
+        timePrefs.setPreferredTimeSlots(List.of(
+                new TimeSlotDto("Mon", List.of(1,2,3,4,5,6,7,8,9)),
+                new TimeSlotDto("Tue", List.of(1,2,3,4,5,6,7,8,9)),
+                new TimeSlotDto("Wed", List.of(1,2,3,4,5,6,7,8,9)),
+                new TimeSlotDto("Thu", List.of(1,2,3,4,5,6,7,8,9))
+                // 금요일은 의도적으로 제외
+        ));
+        userService.saveTimePreferences(userId, timePrefs);
+
+        // given: 4. 복잡한 학점 목표 설정
+        CreditSettingsRequest creditPrefs = new CreditSettingsRequest();
+        creditPrefs.setMinTotalCredits(16);
+        creditPrefs.setMaxTotalCredits(19);
+        creditPrefs.setCreditGoalsPerType(Map.of(
+                "전공", new CreditRangeDto(6, 6),       // 필수 3 + 선택 3 = 정확히 6학점
+                "이중전공", new CreditRangeDto(6, 6), // 정확히 6학점
+                "교양", new CreditRangeDto(4, 4)        // 정확히 4학점
+        ));
+        creditPrefs.setCourseTypeCombination(List.of("전공", "이중전공", "교양"));
+        userService.saveCreditAndCombinationPreferences(userId, creditPrefs);
+
+
+        // when: 시간표 추천 API 호출
+        ResultActions resultActions = mockMvc.perform(
+                get("/users/" + userId + "/timetable/recommendations")
+        );
+
+
+        // then: 모든 조건이 완벽하게 반영된 결과가 빠르게 반환되는지 검증
+        resultActions.andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timetables").isNotEmpty()) // 1. 추천 결과가 존재해야 함
+                // 2. 전체 학점 조건 검증 (16~19학점)
+                .andExpect(jsonPath("$.timetables[0].totalCredits", allOf(greaterThanOrEqualTo(16), lessThanOrEqualTo(19))))
+                // 3. 유형별 학점 목표 정확성 검증
+                .andExpect(jsonPath("$.timetables[0].creditsByType.전공", is(6)))
+                .andExpect(jsonPath("$.timetables[0].creditsByType.이중전공", is(6)))
+                .andExpect(jsonPath("$.timetables[0].creditsByType.교양", is(4)))
+                // 4. 필수/기수강 과목 반영 여부 검증
+                .andExpect(jsonPath("$.timetables[0].scheduledCourses[*].courseCode", hasItem("V41009201")))     // 필수 과목 '운영체제' 포함
+                .andExpect(jsonPath("$.timetables[0].scheduledCourses[*].courseCode", not(hasItem("M01202101")))) // 기수강 과목 '자료구조' 미포함
+                // 5. 시간 선호도(금요일 제외) 반영 여부 검증
+                .andExpect(jsonPath("$.timetables[0].scheduledCourses[*].scheduleSlots[*].day", everyItem(not(is("Fri")))));
+    }
+
+
+    @Test
+    @WithMockUser
+    @DisplayName("모든 필터링(필수,기수강,시간,학점) 적용 후 최종 시간표 추천 테스트")
+    void should_recommend_timetable_that_satisfies_all_user_preferences() throws Exception {
+        // given: 1. 테스트를 위한 기준 사용자 설정
+        User testUser = User.builder()
+                .studentId("20210303")
+                .name("종합테스터")
+                .passwordHash("password")
+                .college(College.공과대학)
+                .major("컴퓨터공학전공")
+                .doubleMajor("스페인어통번역학과")
+                .doubleMajorType(DoubleMajorType.DOUBLE_MAJOR)
+                .grade(3)
+                .semester(1)
+                .build();
+        userRepository.save(testUser);
+        Long userId = testUser.getId();
+
+        UserPreferenceEntity preference = UserPreferenceEntity.builder().user(testUser).build();
+        userPreferenceRepository.save(preference);
+        UserCourseSelectionEntity selection = UserCourseSelectionEntity.builder().user(testUser).build();
+        userCourseSelectionRepository.save(selection);
+
+        // given: 2. 사용자의 모든 선호도 및 수강 정보를 DTO에 담아 저장
+        PreferencesRequest coursePrefs = new PreferencesRequest();
+        coursePrefs.setCompleted_lectures(List.of("T05306201")); // 기수강: 논리회로 수12, 금3
+        coursePrefs.setRequired_lectures(List.of("F02314301"));  // 필수: 전자기학 월34, 수5
+        coursePrefs.setRetake_lectures(List.of("T01209301"));   // 재수강: 전기회로 수6, 금78
+        userService.saveUserCourseSelections(userId, coursePrefs);
+
+        TimePreferenceRequest timePrefs = new TimePreferenceRequest();
+        timePrefs.setPreferredTimeSlots(List.of(
+                new TimeSlotDto("Mon", List.of(3, 4, 5, 6, 7, 8, 9)),
+                new TimeSlotDto("Tue", List.of(3, 4, 5, 6, 7, 8, 9)),
+                new TimeSlotDto("Wed", List.of(3, 4, 5, 6, 7, 8, 9)),
+                new TimeSlotDto("Thu", List.of(3, 4, 5, 6, 7, 8, 9)),
+                new TimeSlotDto("Fri", List.of(3, 4, 5, 6, 7, 8, 9))
+        ));
+        userService.saveTimePreferences(userId, timePrefs);
+
+        CreditSettingsRequest creditPrefs = new CreditSettingsRequest();
+        creditPrefs.setMinTotalCredits(15);
+        creditPrefs.setMaxTotalCredits(18);
+        creditPrefs.setCreditGoalsPerType(Map.of(
+                "전공", new CreditRangeDto(6, 6),
+                "이중전공", new CreditRangeDto(6, 6),
+                "교양", new CreditRangeDto(3, 3)
+        ));
+        creditPrefs.setCourseTypeCombination(List.of("전공", "이중전공", "교양"));
+        userService.saveCreditAndCombinationPreferences(userId, creditPrefs);
+
+        // when: 3. 시간표 추천 API를 호출
+        ResultActions resultActions = mockMvc.perform(
+                get("/users/" + userId + "/timetable/recommendations")
+        );
+
+        // then: 4. 모든 필터링 조건이 반영된 결과가 반환되었는지 검증
+        resultActions.andExpect(status().isOk())
+                .andDo(print())
+                .andExpect(jsonPath("$.timetables").isNotEmpty())
+                .andExpect(jsonPath("$.timetables[0].totalCredits", allOf(greaterThanOrEqualTo(15), lessThanOrEqualTo(18))))
+                .andExpect(jsonPath("$.timetables[0].creditsByType.전공", is(6)))
+                .andExpect(jsonPath("$.timetables[0].creditsByType.이중전공", is(6)))
+                .andExpect(jsonPath("$.timetables[0].creditsByType.교양", is(3)))
+                .andExpect(jsonPath("$.timetables[0].scheduledCourses[*].courseCode", hasItem("F02314301"))) // 필수
+                .andExpect(jsonPath("$.timetables[0].scheduledCourses[*].courseCode", hasItem("T01209301"))) // 재수강
+                .andExpect(jsonPath("$.timetables[0].scheduledCourses[*].courseCode", not(hasItem("T05306201")))) // 기수강 제외
+                .andExpect(jsonPath("$.timetables[0].scheduledCourses[*].scheduleSlots[*].periods[0]", everyItem(greaterThanOrEqualTo(3)))); // 시간 선호도
+    }
+
 }

@@ -38,4 +38,8 @@ public class UserPreferenceEntity {
     @Column(name = "credit_settings_json", columnDefinition = "TEXT")
     @Builder.Default
     private CreditSettingsRequest creditSettings = new CreditSettingsRequest();
+
+    @Lob
+    @Column(name = "saved_timetable_json", columnDefinition = "TEXT")
+    private String savedTimetableJson; // 저장된 시간표(RecommendedTimetableDto)를 JSON 문자열로 저장
 }
