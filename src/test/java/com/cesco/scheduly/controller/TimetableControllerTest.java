@@ -71,7 +71,8 @@ class TimetableControllerTest {
                 .passwordHash("hashed_password")
                 .college(College.공과대학)
                 .major("컴퓨터공학전공")
-                .doubleMajorType(DoubleMajorType.NONE)
+                .doubleMajor("스페인어통번역학과")
+                .doubleMajorType(DoubleMajorType.DOUBLE_MAJOR)
                 .grade(2)
                 .semester(1)
                 .build();
@@ -80,6 +81,32 @@ class TimetableControllerTest {
         // signup 시 자동으로 생성되는 엔티티들을 테스트에서도 명시적으로 생성
         UserPreferenceEntity preference = UserPreferenceEntity.builder().user(testUser).build();
         userPreferenceRepository.saveAndFlush(preference);
+    }
+
+    @Test
+    @WithMockUser
+    @DisplayName("이중전공 사용자가 부전공 학점 목표 설정 시 400 에러 응답 테스트")
+    void should_return_bad_request_when_double_major_user_sets_minor_credit_goal() throws Exception {
+        // given: 2. '부전공' 학점 목표가 포함된, 규칙에 맞지 않는 요청(Request) 데이터를 준비합니다.
+        Long userId = testUser.getId();
+        CreditSettingsRequest requestDto = new CreditSettingsRequest();
+        requestDto.setCreditGoalsPerType(Map.of(
+                "이중전공", new CreditRangeDto(9, 12),
+                "부전공", new CreditRangeDto(3, 3) // <--- 이 부분이 유효성 검사에 걸리는 부분입니다.
+        ));
+        requestDto.setMinTotalCredits(12);
+        requestDto.setMaxTotalCredits(15);
+
+        String requestBody = objectMapper.writeValueAsString(requestDto);
+
+        // when & then: 학점 목표 저장 API(/users/{userId}/timetable/preferences/settings)를 호출합니다.
+        // 그 결과로 HTTP 400 상태 코드와 정확한 에러 메시지를 반환하는지 검증합니다.
+        mockMvc.perform(put("/users/" + userId + "/timetable/preferences/settings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andDo(print()) // 요청/응답 전체 내용을 콘솔에 출력하여 확인
+                .andExpect(status().isBadRequest()) // 400 Bad Request 상태 코드를 기대
+                .andExpect(jsonPath("$.message").value("'이중전공' 사용자는 '부전공' 또는 '전공심화' 학점 목표를 설정할 수 없습니다.")); // 정확한 에러 메시지를 기대
     }
 
     @Test

@@ -1,13 +1,13 @@
 package com.cesco.scheduly.service;
 
 import com.cesco.scheduly.dto.course.PreferencesRequest;
+import com.cesco.scheduly.dto.timetable.CreditRangeDto;
 import com.cesco.scheduly.dto.timetable.CreditSettingsRequest;
 import com.cesco.scheduly.dto.timetable.TimePreferenceRequest;
 import com.cesco.scheduly.dto.user.MyPageResponse;
 import com.cesco.scheduly.dto.user.MyPageUpdateRequest;
 import com.cesco.scheduly.dto.user.SignupRequest;
 import com.cesco.scheduly.entity.User;
-import com.cesco.scheduly.dto.timetable.CreditRangeDto;
 import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.entity.UserPreferenceEntity;
 import com.cesco.scheduly.enums.DoubleMajorType;
@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -231,7 +232,9 @@ public class UserService {
     public void saveCreditAndCombinationPreferences(Long userId, CreditSettingsRequest settings) {
         logger.info("Saving credit and combination preferences for user ID: {}", userId);
 
-        validateCreditSettings(settings);
+        User user = getUserDetails(userId);
+
+        validateCreditSettings(settings, user);
 
         UserPreferenceEntity userPref = getUserPreference(userId);
         userPref.setCreditSettings(settings != null ? settings : new CreditSettingsRequest());
@@ -239,7 +242,42 @@ public class UserService {
         logger.info("Credit and combination preferences saved for user ID: {}. Data: {}", userId, settings);
     }
 
-    private void validateCreditSettings(CreditSettingsRequest settings) {
+    private void validateCreditSettings(CreditSettingsRequest settings, User user) {
+        if (settings.getCreditGoalsPerType() != null && !settings.getCreditGoalsPerType().isEmpty()) {
+            DoubleMajorType userMajorType = user.getDoubleMajorType(); // 사용자의 전공 유형
+            Set<String> goalTypes = settings.getCreditGoalsPerType().keySet(); // 사용자가 설정한 목표 유형들
+
+            // 사용자의 전공 유형에 따라 설정 불가능한 목표가 있는지 확인
+            switch (userMajorType) {
+                case DOUBLE_MAJOR: // "이중전공" 사용자
+                    if (goalTypes.contains("부전공") || goalTypes.contains("전공심화")) {
+                        throw new IllegalArgumentException("'이중전공' 사용자는 '부전공' 또는 '전공심화' 학점 목표를 설정할 수 없습니다.");
+                    }
+                    break;
+                case MINOR: // "부전공" 사용자
+                    if (goalTypes.contains("이중전공") || goalTypes.contains("전공심화")) {
+                        throw new IllegalArgumentException("'부전공' 사용자는 '이중전공' 또는 '전공심화' 학점 목표를 설정할 수 없습니다.");
+                    }
+                    break;
+                case INTENSIVE: // "전공심화" 사용자
+                    if (goalTypes.contains("이중전공") || goalTypes.contains("부전공")) {
+                        throw new IllegalArgumentException("'전공심화' 사용자는 '이중전공' 또는 '부전공' 학점 목표를 설정할 수 없습니다.");
+                    }
+                    break;
+                case INTENSIVE_MINOR: // "전공심화 + 부전공" 사용자
+                    if (goalTypes.contains("이중전공")) {
+                        throw new IllegalArgumentException("'전공심화+부전공' 사용자는 '이중전공' 학점 목표를 설정할 수 없습니다.");
+                    }
+                    break;
+                case NONE: // "해당없음" 사용자
+                    if (goalTypes.contains("이중전공") || goalTypes.contains("부전공") || goalTypes.contains("전공심화")) {
+                        throw new IllegalArgumentException("'해당없음' 사용자는 이중/부/심화전공 학점 목표를 설정할 수 없습니다.");
+                    }
+                    break;
+            }
+        }
+
+
         // 전체 최소/최대 학점 목표가 없으면 검증할 필요가 없음
         if (settings.getMinTotalCredits() == null || settings.getMaxTotalCredits() == null) {
             return;
