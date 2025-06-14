@@ -75,17 +75,17 @@ public class UserService {
 
         List<String> modules = dto.getModules(); // DTO에서 모듈 리스트를 가져옴
 
-        if ("융합인재전공".equals(dto.getMajor())) {
+        if ("융합인재학부".equals(dto.getMajor())) {
             if (modules == null || modules.size() != 3) {
-                throw new IllegalArgumentException("융합인재전공(주전공)은 3개의 모듈을 선택해야 합니다.");
+                throw new IllegalArgumentException("융합인재학부(주전공)은 3개의 모듈을 선택해야 합니다.");
             }
             module1 = FusionMajorModule.valueOf(modules.get(0));
             module2 = FusionMajorModule.valueOf(modules.get(1));
             module3 = FusionMajorModule.valueOf(modules.get(2));
 
-        } else if ("융합인재전공".equals(dto.getDouble_major())) {
+        } else if ("융합인재학부".equals(dto.getDouble_major())) {
             if (modules == null || modules.size() != 2) {
-                throw new IllegalArgumentException("융합인재전공(이중전공)은 2개의 모듈을 선택해야 합니다.");
+                throw new IllegalArgumentException("융합인재학부(이중전공)은 2개의 모듈을 선택해야 합니다.");
             }
             module1 = FusionMajorModule.valueOf(modules.get(0));
             module2 = FusionMajorModule.valueOf(modules.get(1));
