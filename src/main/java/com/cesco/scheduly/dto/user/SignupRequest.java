@@ -25,8 +25,11 @@ public class SignupRequest {
     private String major;
 
     @Getter
-    private String double_major_type; // 부전공 / 이중전공 / 전공심화 중 택1
-    private String double_major;
+    @JsonProperty("double_major")
+    private String doubleMajor;
+
+    @JsonProperty("double_major_type")
+    private String doubleMajorType;
 
     private List<String> modules;
     private FusionMajorModule module1;

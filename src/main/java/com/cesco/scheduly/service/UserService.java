@@ -83,7 +83,7 @@ public class UserService {
             module2 = FusionMajorModule.valueOf(modules.get(1));
             module3 = FusionMajorModule.valueOf(modules.get(2));
 
-        } else if ("융합인재학부".equals(dto.getDouble_major())) {
+        } else if ("융합인재학부".equals(dto.getDoubleMajor())) {
             if (modules == null || modules.size() != 2) {
                 throw new IllegalArgumentException("융합인재학부(이중전공)은 2개의 모듈을 선택해야 합니다.");
             }
@@ -94,14 +94,14 @@ public class UserService {
 
         // User 엔티티에 @Builder, @NoArgsConstructor, @AllArgsConstructor 어노테이션이 있다고 가정
         // User.java에 @Builder.Default로 createdAt = LocalDateTime.now()가 설정되어 있어야 함
-        String doubleMajorType = dto.getDouble_major_type();
+        String doubleMajorType = dto.getDoubleMajorType();
         User user = User.builder()
                 .studentId(dto.getStudentId())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .name(dto.getName())
                 .major(dto.getMajor())
-                .doubleMajor(dto.getDouble_major()) // DTO의 필드명 snake_case 유의
-                .doubleMajorType(DoubleMajorType.valueOf(dto.getDouble_major_type())) // 부전공/이중전공/전공심화
+                .doubleMajor(dto.getDoubleMajor()) // DTO의 필드명 snake_case 유의
+                .doubleMajorType(DoubleMajorType.valueOf(dto.getDoubleMajorType())) // 부전공/이중전공/전공심화
                 .grade(dto.getGrade())
                 .semester(dto.getSemester())
                 .college(dto.getCollege())
