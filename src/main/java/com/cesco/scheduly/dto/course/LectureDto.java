@@ -13,9 +13,6 @@ public class LectureDto {
     private String name;
     private String code;
     private String professor;
-    private int year;
-    private int semester;
-    private String department;
 
     public static LectureDto from(LectureEntity lectureEntity) {
         return LectureDto.builder()
