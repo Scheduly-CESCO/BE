@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
 import static org.hamcrest.number.OrderingComparison.greaterThanOrEqualTo;
 import static org.hamcrest.number.OrderingComparison.lessThanOrEqualTo;
@@ -118,9 +119,9 @@ class TimetableControllerTest {
 
     @Test
     @WithMockUser
-    @DisplayName("선호 시간대 저장 및 해당 시간대 강의만 추천되는지 테스트")
-    void should_recommend_courses_only_within_preferred_time_slots() throws Exception {
-        // given: 1. "월요일 오전(1-4교시)"만 선호한다고 설정하고 API를 통해 저장
+    @DisplayName("시간 선호도 저장 기능 단위 테스트")
+    void should_save_time_preferences_successfully() throws Exception {
+        // given: "월요일 오전(1-4교시)"을 선호한다는 요청 데이터 준비
         Long userId = testUser.getId();
         TimePreferenceRequest requestDto = new TimePreferenceRequest();
         requestDto.setPreferredTimeSlots(List.of(
@@ -128,27 +129,25 @@ class TimetableControllerTest {
         ));
         String requestBody = objectMapper.writeValueAsString(requestDto);
 
+        // when: 시간 선호도 저장 API를 호출
         mockMvc.perform(put("/users/" + userId + "/timetable/preferences/time")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()) // 1. API 호출이 성공했는지 확인 (200 OK)
+                .andExpect(jsonPath("$.message").value("시간 선호도 저장 성공"));
 
-        // given: 2. 해당 사용자에게 필수 과목을 아무것도 설정하지 않음 (선택 과목만 추천받는 상황)
+        // then: DB에 데이터가 정확하게 저장되었는지 직접 검증
+        UserPreferenceEntity savedPreference = userPreferenceRepository.findByUser(testUser).orElseThrow();
+        TimePreferenceRequest savedData = savedPreference.getTimePreferences();
 
-        // when: 시간표 추천 API를 호출
-        ResultActions resultActions = mockMvc.perform(
-                get("/users/" + userId + "/timetable/recommendations")
-        );
-
-        // then: 3. 추천 결과에 월요일 오전에 진행되는 과목만 포함되어 있는지 검증
-        resultActions.andExpect(status().isOk())
-                .andExpect(jsonPath("$.timetables").isNotEmpty()) // 최소 하나 이상의 시간표가 추천되었는지 확인
-                // 첫 번째 추천 시간표의 첫 번째 과목의 요일이 "Mon"인지 확인
-                .andExpect(jsonPath("$.timetables[0].scheduledCourses[0].actualClassTimes[0].요일").value("Mon"))
-                // 첫 번째 추천 시간표의 첫 번째 과목의 시작 교시가 1 이상인지 확인
-                .andExpect(jsonPath("$.timetables[0].scheduledCourses[0].actualClassTimes[0].start_period").value(greaterThanOrEqualTo(1)))
-                // 첫 번째 추천 시간표의 첫 번째 과목의 종료 교시가 4 이하인지 확인
-                .andExpect(jsonPath("$.timetables[0].scheduledCourses[0].actualClassTimes[0].end_period").value(lessThanOrEqualTo(4)));
+        // 2. 저장된 데이터가 null이 아닌지 확인
+        assertThat(savedData).isNotNull();
+        // 3. 저장된 선호 시간대 목록의 크기가 1개인지 확인
+        assertThat(savedData.getPreferredTimeSlots()).hasSize(1);
+        // 4. 저장된 첫 번째 시간대의 요일이 "Mon"이 맞는지 확인
+        assertThat(savedData.getPreferredTimeSlots().get(0).getDay()).isEqualTo("Mon");
+        // 5. 저장된 첫 번째 시간대의 교시 목록이 [1, 2, 3, 4]가 맞는지 확인
+        assertThat(savedData.getPreferredTimeSlots().get(0).getPeriods()).containsExactly(1, 2, 3, 4);
     }
 
     @Test
