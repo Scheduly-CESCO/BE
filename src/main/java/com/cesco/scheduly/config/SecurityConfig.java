@@ -51,9 +51,11 @@ public class SecurityConfig {
 
                         .requestMatchers("/auth/signup", "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/courses/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/courses/user-selections").authenticated()
                         .requestMatchers("/preferences/**").authenticated()
                         .requestMatchers("/lectures/**").authenticated()
-                        .requestMatchers("/users/{userId}/timetable/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/graduation/credits").authenticated()
+                        .requestMatchers("/users/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
