@@ -1,8 +1,10 @@
 package com.cesco.scheduly.dto.timetable;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -17,7 +19,10 @@ public class TimeSlotDto {
     private List<Integer> periods;
 
     // 프론트엔드 전달용 계산 필드
+    @Schema(accessMode = Schema.AccessMode.READ_ONLY)
     private int startPeriod;
+
+    @Schema(accessMode = Schema.AccessMode.READ_ONLY)
     private int endPeriod;
 
     // JSON 파싱 시 Jackson이 사용할 생성자
