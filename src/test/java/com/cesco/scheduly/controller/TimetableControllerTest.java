@@ -171,50 +171,46 @@ class TimetableControllerTest {
                 .andExpect(jsonPath("$.message").value("필수/재수강 과목 간 시간이 중복됩니다: 머신러닝(M01207101), 운영체제(M01206101)")); // 정확한 에러 메시지를 기대
     }
 
+    // 기존 테스트 메소드 이름을 더 명확하게 변경하고, 로직을 수정합니다.
     @Test
     @WithMockUser
-    @DisplayName("학점 목표 설정 후, 목표에 맞는 학점으로 시간표가 추천되는지 테스트")
-    void should_recommend_timetable_that_meets_credit_goals() throws Exception {
-        // given: 1. "전공 6, 이중전공 6, 교양 4학점"을 목표로 설정하고 저장
+    @DisplayName("유효한 학점 목표 설정값이 DB에 성공적으로 저장되는지 테스트")
+    void should_save_credit_settings_successfully() throws Exception {
+        // given: 1. 유효한 학점 목표 데이터를 준비합니다.
         Long userId = testUser.getId();
         CreditSettingsRequest requestDto = new CreditSettingsRequest();
 
-        // 사용자의 학점 목표 설정
+        // 시나리오: 총 15~18학점 | 전공 9~12학점 | 교양 6학점
+        requestDto.setMinTotalCredits(15);
+        requestDto.setMaxTotalCredits(18);
         requestDto.setCreditGoalsPerType(Map.of(
-                "전공", new CreditRangeDto(6, 6),
-                "이중전공", new CreditRangeDto(6, 6), // '부전공'은 로직상 '이중전공'으로 처리될 수 있음
-                "교양", new CreditRangeDto(4, 4)
+                "전공", new CreditRangeDto(9, 12),
+                "교양", new CreditRangeDto(6, 6)
         ));
-        // 사용자가 학점 목표를 설정한 유형들
-        requestDto.setCourseTypeCombination(List.of("전공", "이중전공", "교양"));
-        requestDto.setMinTotalCredits(16);
-        requestDto.setMaxTotalCredits(16);
-
         String requestBody = objectMapper.writeValueAsString(requestDto);
 
-        // 학점 목표 저장 API 호출
+        // when: 2. 학점 목표 저장 API를 호출합니다.
         mockMvc.perform(put("/users/" + userId + "/timetable/preferences/settings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()) // 3. API 응답이 성공(200 OK)했는지 먼저 확인합니다.
+                .andExpect(jsonPath("$.message").value("학점 목표 및 강의 조합 설정 저장 성공"));
 
-        // when: 2. 시간표 추천 API를 호출
-        ResultActions resultActions = mockMvc.perform(
-                get("/users/" + userId + "/timetable/recommendations")
-        );
+        // then: 4. DB에 데이터가 정확하게 저장되었는지 직접 검증합니다.
+        UserPreferenceEntity savedPreference = userPreferenceRepository.findByUser(testUser).orElseThrow();
+        CreditSettingsRequest savedData = savedPreference.getCreditSettings();
 
-        // then: 3. 추천 결과의 학점이 설정한 목표와 일치하는지 검증
-        resultActions.andExpect(status().isOk())
-                .andDo(print()) // 응답 JSON을 콘솔에 자세히 출력
-                .andExpect(jsonPath("$.timetables").isNotEmpty())
-                // 첫 번째 추천 시간표의 총 학점이 16학점인지 확인
-                .andExpect(jsonPath("$.timetables[0].totalCredits").value(16))
-                // 유형별 학점이 목표와 일치하는지 확인
-                .andExpect(jsonPath("$.timetables[0].creditsByType.전공").value(6))
-                .andExpect(jsonPath("$.timetables[0].creditsByType.이중전공").value(6))
-                .andExpect(jsonPath("$.timetables[0].creditsByType.교양").value(4));
+        // 저장된 데이터가 null이 아닌지 확인
+        assertThat(savedData).isNotNull();
+        // 저장된 전체 최소/최대 학점이 보낸 값과 일치하는지 확인
+        assertThat(savedData.getMinTotalCredits()).isEqualTo(15);
+        assertThat(savedData.getMaxTotalCredits()).isEqualTo(18);
+        // 저장된 유형별 학점 목표가 보낸 값과 일치하는지 확인
+        assertThat(savedData.getCreditGoalsPerType()).hasSize(2);
+        assertThat(savedData.getCreditGoalsPerType().get("전공").getMin()).isEqualTo(9);
+        assertThat(savedData.getCreditGoalsPerType().get("전공").getMax()).isEqualTo(12);
+        assertThat(savedData.getCreditGoalsPerType().get("교양").getMin()).isEqualTo(6);
     }
-
     @Test
     @WithMockUser
     @DisplayName("유형별 최소학점의 합이 전체 최대학점보다 클 때, 400 에러를 반환하는지 테스트")

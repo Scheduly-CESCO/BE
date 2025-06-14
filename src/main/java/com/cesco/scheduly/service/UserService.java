@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -278,34 +279,40 @@ public class UserService {
 
     private void validateCreditSettings(CreditSettingsRequest settings, User user) {
         if (settings.getCreditGoalsPerType() != null && !settings.getCreditGoalsPerType().isEmpty()) {
-            DoubleMajorType userMajorType = user.getDoubleMajorType(); // 사용자의 전공 유형
-            Set<String> goalTypes = settings.getCreditGoalsPerType().keySet(); // 사용자가 설정한 목표 유형들
+            DoubleMajorType userMajorType = user.getDoubleMajorType();
+            Map<String, CreditRangeDto> goals = settings.getCreditGoalsPerType();
 
-            // 사용자의 전공 유형에 따라 설정 불가능한 목표가 있는지 확인
+            // 0학점 초과로 설정된 목표 유형만 추출
+            Set<String> nonZeroGoalTypes = goals.entrySet().stream()
+                    .filter(entry -> entry.getValue().getMax() > 0)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toSet());
+
+            // 사용자의 전공 유형에 따라 설정 불가능한 '0학점 초과' 목표가 있는지 확인
             switch (userMajorType) {
-                case DOUBLE_MAJOR: // "이중전공" 사용자
-                    if (goalTypes.contains("부전공") || goalTypes.contains("전공심화")) {
-                        throw new IllegalArgumentException("'이중전공' 사용자는 '부전공' 또는 '전공심화' 학점 목표를 설정할 수 없습니다.");
+                case DOUBLE_MAJOR: // 이중전공 사용자
+                    if (nonZeroGoalTypes.contains("부전공")) {
+                        throw new IllegalArgumentException("'이중전공' 사용자는 '부전공'에 0학점을 초과하여 설정할 수 없습니다.");
                     }
                     break;
-                case MINOR: // "부전공" 사용자
-                    if (goalTypes.contains("이중전공") || goalTypes.contains("전공심화")) {
-                        throw new IllegalArgumentException("'부전공' 사용자는 '이중전공' 또는 '전공심화' 학점 목표를 설정할 수 없습니다.");
+                case MINOR: // 부전공 사용자
+                    if (nonZeroGoalTypes.contains("이중전공")) {
+                        throw new IllegalArgumentException("'부전공' 사용자는 '이중전공'에 0학점을 초과하여 설정할 수 없습니다.");
                     }
                     break;
-                case INTENSIVE: // "전공심화" 사용자
-                    if (goalTypes.contains("이중전공") || goalTypes.contains("부전공")) {
-                        throw new IllegalArgumentException("'전공심화' 사용자는 '이중전공' 또는 '부전공' 학점 목표를 설정할 수 없습니다.");
+                case INTENSIVE: // 전공심화 사용자
+                    if (nonZeroGoalTypes.contains("이중전공") || nonZeroGoalTypes.contains("부전공")) {
+                        throw new IllegalArgumentException("'전공심화' 사용자는 '이중전공' 또는 '부전공'에 0학점을 초과하여 설정할 수 없습니다.");
                     }
                     break;
-                case INTENSIVE_MINOR: // "전공심화 + 부전공" 사용자
-                    if (goalTypes.contains("이중전공")) {
-                        throw new IllegalArgumentException("'전공심화+부전공' 사용자는 '이중전공' 학점 목표를 설정할 수 없습니다.");
+                case NONE: // 전공이 없는 사용자
+                    if  (nonZeroGoalTypes.contains("이중전공") || nonZeroGoalTypes.contains("부전공")) {
+                        throw new IllegalArgumentException("'전공 없음' 사용자는 '이중전공', '부전공'에 0학점을 초과하여 설정할 수 없습니다.");
                     }
                     break;
-                case NONE: // "해당없음" 사용자
-                    if (goalTypes.contains("이중전공") || goalTypes.contains("부전공") || goalTypes.contains("전공심화")) {
-                        throw new IllegalArgumentException("'해당없음' 사용자는 이중/부/심화전공 학점 목표를 설정할 수 없습니다.");
+                case INTENSIVE_MINOR: // 전공심화 부전공 사용자
+                    if (nonZeroGoalTypes.contains("이중전공")) {
+                        throw new IllegalArgumentException("'전공심화 + 부전공' 사용자는 '이중전공'에 0학점을 초과하여 설정할 수 없습니다.");
                     }
                     break;
             }
