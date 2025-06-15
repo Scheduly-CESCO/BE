@@ -1,5 +1,8 @@
 package com.cesco.scheduly.controller;
 
+import com.cesco.scheduly.entity.UserCourseSelectionEntity;
+import com.cesco.scheduly.model.DetailedCourseInfo;
+import com.cesco.scheduly.service.CourseDataService;
 import com.cesco.scheduly.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +10,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/preferences")
@@ -14,6 +20,7 @@ import java.util.List;
 public class PreferencesController {
 
   private final UserService userService;
+  private final CourseDataService courseDataService;
 
   // 기수강 과목 추가
   @PostMapping("/completed")
@@ -73,5 +80,22 @@ public class PreferencesController {
   ) {
     userService.removeRetakeCourses(userId, lecturesToRemove);
     return ResponseEntity.ok(Map.of("status", "retake_removed"));
+  }
+
+  @GetMapping("/courses")
+  public ResponseEntity<Map<String, List<DetailedCourseInfo>>> getAllUserCourses(@RequestParam Long userId) {
+    UserCourseSelectionEntity selection = userService.getUserCourseSelectionByUserId(userId); // 아래 설명 참고
+    Function<List<String>, List<DetailedCourseInfo>> toDetails = courseCodes -> courseCodes.stream()
+            .map(courseDataService::getDetailedCourseByCode)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+
+    Map<String, List<DetailedCourseInfo>> result = Map.of(
+            "taken", toDetails.apply(selection.getTakenCourses()),
+            "mandatory", toDetails.apply(selection.getMandatoryCourses()),
+            "retake", toDetails.apply(selection.getRetakeCourses())
+    );
+
+    return ResponseEntity.ok(result);
   }
 }

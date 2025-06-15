@@ -30,10 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -474,5 +471,10 @@ public class UserService {
             combinedList.addAll(selection.getRetakeCourses());
         }
         return combinedList.stream().distinct().collect(Collectors.toList());
+    }
+
+    public UserCourseSelectionEntity getUserCourseSelectionByUserId(Long userId) {
+        return userCourseSelectionRepository.findByUser_Id(userId)
+                .orElseThrow(() -> new NoSuchElementException("선택 과목 정보가 존재하지 않습니다. userId = " + userId));
     }
 }

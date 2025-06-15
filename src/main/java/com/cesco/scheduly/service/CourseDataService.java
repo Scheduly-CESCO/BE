@@ -4,6 +4,7 @@ package com.cesco.scheduly.service;
 import com.cesco.scheduly.dto.course.CourseInfo;
 import com.cesco.scheduly.dto.timetable.TimeSlotDto;
 import com.cesco.scheduly.entity.CourseEntity;
+import com.cesco.scheduly.entity.UserCourseSelectionEntity;
 import com.cesco.scheduly.model.DetailedCourseInfo;
 import com.cesco.scheduly.repository.CourseRepository;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -103,6 +106,19 @@ public class CourseDataService {
                 entity.getRemarks(),
                 finalScheduleSlots, // 수정된 scheduleSlots 리스트를 전달
                 entity.isRestrictedCourse()
+        );
+    }
+
+    public Map<String, List<DetailedCourseInfo>> getUserCourseDetails(UserCourseSelectionEntity selection) {
+        Function<List<String>, List<DetailedCourseInfo>> toDetails = courseCodes -> courseCodes.stream()
+                .map(this::getDetailedCourseByCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        return Map.of(
+                "taken", toDetails.apply(selection.getTakenCourses()),
+                "mandatory", toDetails.apply(selection.getMandatoryCourses()),
+                "retake", toDetails.apply(selection.getRetakeCourses())
         );
     }
 }
