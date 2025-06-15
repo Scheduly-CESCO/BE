@@ -46,7 +46,7 @@ class TimetableServiceTest {
                 .grade(2)
                 .major("AI데이터융합전공")
                 .doubleMajorType(DoubleMajorType.DOUBLE_MAJOR)
-                .doubleMajor("경영정보학과")
+                .doubleMajor("Global Business & Technology전공")
                 .college(College.AI융합대학)
                 .build();
     }
@@ -58,15 +58,16 @@ class TimetableServiceTest {
 
         // - 기수강, 필수, 재수강 과목 설정
         UserCourseSelectionEntity selections = new UserCourseSelectionEntity();
-        selections.setTakenCourses(List.of("C001", "C003")); // 컴과개론(C001), 기초프로그래밍(C003) 수강 완료
-        selections.setMandatoryCourses(List.of("C002"));     // 자료구조(C002)는 이번 학기 필수
-        selections.setRetakeCourses(List.of("C003"));        // 기초프로그래밍(C003)은 재수강 대상
+        selections.setTakenCourses(List.of("V41010101", "V41002201")); // 고파썬, 컴논개
+        selections.setMandatoryCourses(List.of("M01201101"));     // 통계모델링, 수456, 필수
+        selections.setRetakeCourses(List.of("M01301101"));        // 비정형데이터마이닝, 화456, 재수강
 
         // - 시간 및 학점 선호도 설정
         TimePreferenceRequest timePrefs = new TimePreferenceRequest();
         timePrefs.setPreferredTimeSlots(List.of(
-                new TimeSlotDto("Mon", List.of(5, 6, 7)), // 월요일 오후
-                new TimeSlotDto("Wed", List.of(5, 6, 7, 8, 9)) // 수요일 오후
+                new TimeSlotDto("Mon", List.of(4, 5, 6, 7)), // 월요일 오후
+                new TimeSlotDto("Wed", List.of(4, 5, 6, 7, 8, 9)), // 수요일 오후
+                new TimeSlotDto("Tue", List.of(4, 5, 6, 7, 8, 9)) // 수요일 오후
         ));
 
         CreditSettingsRequest creditSettings = new CreditSettingsRequest();
@@ -107,9 +108,9 @@ class TimetableServiceTest {
                 .toList();
 
         // - 필수/재수강/기수강 과목 검증
-        assertThat(recommendedCourseCodes).contains("C002"); // 필수과목(자료구조) 포함 확인
-        assertThat(recommendedCourseCodes).contains("C003"); // 재수강과목(기초프로그래밍) 포함 확인
-        assertThat(recommendedCourseCodes).doesNotContain("C001"); // 순수 기수강과목(컴과개론) 미포함 확인
+        assertThat(recommendedCourseCodes).contains("M01201101"); // 필수과목 포함 확인
+        assertThat(recommendedCourseCodes).contains("M01301101"); // 재수강과목 포함 확인
+        assertThat(recommendedCourseCodes).doesNotContain("V41010101", "V41002201"); // 순수 기수강과목(컴과개론) 미포함 확인
 
         // - 학점 목표 검증
         Map<String, Integer> creditsByType = firstTimetable.getCreditsByType();
@@ -121,8 +122,8 @@ class TimetableServiceTest {
         // - 시간 선호도 검증
         firstTimetable.getScheduledCourses().forEach(course -> {
             course.getActualClassTimes().forEach(slot -> {
-                assertThat(slot.getDay()).isIn("Mon", "Wed"); // 추천된 과목은 월요일 또는 수요일이어야 함
-                assertThat(slot.getStartPeriod()).isGreaterThanOrEqualTo(5); // 모든 수업은 5교시 이후에 시작해야 함
+                assertThat(slot.getDay()).isIn("Mon", "Tue", "Wed"); // 추천된 과목은 월요일 또는 수요일이어야 함
+                assertThat(slot.getStartPeriod()).isGreaterThanOrEqualTo(4); // 모든 수업은 5교시 이후에 시작해야 함
             });
         });
     }
@@ -131,19 +132,20 @@ class TimetableServiceTest {
     private List<DetailedCourseInfo> createMockCourseList() {
         return List.of(
                 // 기수강 과목 (추천 제외 대상)
-                createCourse("C001", "컴퓨터과학개론", "AI데이터융합전공", "전공", 3, new TimeSlotDto("Tue", List.of(1, 2))),
+                createCourse("V41010101", "고급파이썬프로그래밍", "AI융합전공", "전공", 3, new TimeSlotDto("Thu", List.of(4, 5, 6))),
+                createCourse("V41002201", "컴퓨터수학", "AI융합전공", "전공", 3, new TimeSlotDto("Tue", List.of(4, 5, 6))),
                 // 필수 과목 (반드시 포함)
-                createCourse("C002", "자료구조와알고리즘", "AI데이터융합전공", "전공", 3, new TimeSlotDto("Mon", List.of(5, 6))),
+                createCourse("M01201101", "통계모델링", "AI데이터융합전공", "전공", 3, new TimeSlotDto("Wed", List.of(4, 5, 6))),
                 // 재수강 과목 (반드시 포함)
-                createCourse("C003", "기초프로그래밍", "AI데이터융합전공", "전공", 3, new TimeSlotDto("Wed", List.of(5, 6))),
+                createCourse("M01301101", "비정형데이터마이닝", "AI데이터융합전공", "전공", 3, new TimeSlotDto("Tue", List.of(4, 5, 6))),
                 // 이중전공 선택과목 (선택 가능)
-                createCourse("C004", "경영학원론", "경영정보학과", "전공", 3, new TimeSlotDto("Mon", List.of(7, 8))),
+                createCourse("D01205A02", "회계원리", "Global Business & Technology전공", "전공", 3, new TimeSlotDto("Mon", List.of(4, 5, 6))),
                 // 교양 선택과목 (선택 가능)
-                createCourse("C005", "글쓰기", "교양", "교양", 3, new TimeSlotDto("Wed", List.of(7, 8))),
+                createCourse("Y13115302", "대학중국어1", null, "교양", 3, new TimeSlotDto("Wed", List.of(7, 8,9))),
                 // 시간 선호도에 맞지 않는 과목 (추천 제외 대상)
-                createCourse("C006", "이산수학", "AI데이터융합전공", "전공", 3, new TimeSlotDto("Mon", List.of(1, 2))), // 오전 수업
+                createCourse("P05412101", "비즈니스머신러닝", "Global Business & Technology전공", "전공", 3, new TimeSlotDto("Mon", List.of(1, 2, 3))), // 오전 수업
                 // 요일이 맞지 않는 과목 (추천 제외 대상)
-                createCourse("C007", "웹프로그래밍", "AI데이터융합전공", "전공", 3, new TimeSlotDto("Fri", List.of(5, 6))) // 금요일 수업
+                createCourse("P05309101", "빅데이터분석", "Global Business & Technology전공", "전공", 3, new TimeSlotDto("Fri", List.of(1, 2, 3))) // 금요일 수업
         );
     }
 

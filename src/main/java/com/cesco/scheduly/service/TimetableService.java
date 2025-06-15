@@ -184,7 +184,6 @@ public class TimetableService {
         // 2. [최적화] 대폭 줄어든 풀을 기반으로, 유형별 선택과목 풀 생성
         Map<String, List<DetailedCourseInfo>> electivesByType = timeFilteredPool.stream()
                 .filter(c -> {
-                    // 필수/재수강으로 이미 선택된 과목 및 동일 그룹 과목 제외
                     String identifier = c.getGroupId() != null ? c.getGroupId() : c.getCourseCode();
                     return !initialCourseIdentifiers.contains(identifier);
                 })
@@ -192,19 +191,47 @@ public class TimetableService {
 
         // 3. [분할] 각 목표 유형별로 학점 조건을 만족하는 '부분 조합' 리스트를 미리 계산
         Map<String, List<List<DetailedCourseInfo>>> combinationsByType = new HashMap<>();
+
+        // ★★★ 수정 지점 1: 초기 과목(필수/재수강)이 채운 학점을 미리 계산 ★★★
+        Map<String, Integer> initialCreditsByType = calculateCreditsByTypeForUser(initialTimetableBase, currentUser, creditSettings);
+
         for (String type : targetCourseTypes) {
-            CreditRangeDto range = creditSettings.getCreditGoalsPerType().get(type);
-            if (range == null || range.getMax() <= 0) continue;
+            CreditRangeDto originalRange = creditSettings.getCreditGoalsPerType().get(type);
+            if (originalRange == null || originalRange.getMax() <= 0) continue;
 
+            // ★★★ 수정 지점 2: 초기 학점을 반영하여 이번에 '추가로' 채워야 할 학점 범위를 새로 계산 ★★★
+            int initialCredits = initialCreditsByType.getOrDefault(type, 0);
+            int newMin = Math.max(0, originalRange.getMin() - initialCredits); // 최소값은 0보다 작을 수 없음
+            int newMax = originalRange.getMax() - initialCredits;
+
+            // 이미 필수과목만으로 최대 학점을 초과했거나, 최소 학점 이상을 만족한 경우
+            if (newMax < 0 || newMax < newMin) {
+                // 해당 타입은 더 이상 과목을 추가할 필요가 없으므로 '빈 조합'을 추가하고 넘어감
+                combinationsByType.put(type, Collections.singletonList(new ArrayList<>()));
+                continue;
+            }
+
+            CreditRangeDto adjustedRange = new CreditRangeDto(newMin, newMax);
             List<DetailedCourseInfo> typePool = electivesByType.getOrDefault(type, Collections.emptyList());
-            List<List<DetailedCourseInfo>> typeCombinations = findCombinationsForType(typePool, range);
 
-            // 해당 유형의 조합이 필수적인데 생성되지 않았다면, 더 이상 진행 불가
-            if (range.getMin() > 0 && typeCombinations.isEmpty()) {
-                logger.warn("User ID {}: 필수 요건인 '{}' 유형 (최소 {}학점) 과목 조합을 생성할 수 없어 시간표 추천이 불가능합니다.", currentUser.getId(), type, range.getMin());
+            // 조정된 학점 범위(adjustedRange)를 기준으로 조합 탐색
+            List<List<DetailedCourseInfo>> typeCombinations = findCombinationsForType(typePool, adjustedRange);
+
+            // ★★★ 수정 지점 3: 추가로 필요한 최소 학점이 0이고, 찾은 조합이 없는 경우 ★★★
+            // -> 과목을 추가하지 않는 '빈 조합'도 유효한 선택지이므로 추가해줌
+            if (typeCombinations.isEmpty() && newMin == 0) {
+                typeCombinations.add(new ArrayList<>());
+            }
+
+            // 필수적으로 추가 학점이 필요한데 조합을 못 만든 경우, 실패 처리
+            if (newMin > 0 && typeCombinations.isEmpty()) {
+                logger.warn("User ID {}: 필수 요건인 '{}' 유형 (추가 필요 학점: 최소 {}학점) 과목 조합을 생성할 수 없어 시간표 추천이 불가능합니다.", currentUser.getId(), type, newMin);
                 return Collections.emptyList();
             }
-            combinationsByType.put(type, typeCombinations);
+
+            if (!typeCombinations.isEmpty()) {
+                combinationsByType.put(type, typeCombinations);
+            }
         }
 
         // 4. [정복] 생성된 부분 조합들을 재귀적으로 결합하여 최종 시간표 완성
@@ -236,6 +263,17 @@ public class TimetableService {
             DetailedCourseInfo courseToAdd = pool.get(i);
             if (currentCredits + courseToAdd.getCredits() > range.getMax()) continue;
 
+            // Group ID를 이용한 중복 수강 방지 로직 추가
+            String courseIdentifier = courseToAdd.getGroupId() != null ? courseToAdd.getGroupId() : courseToAdd.getCourseCode();
+            boolean isDuplicate = currentCombination.stream()
+                    .anyMatch(c -> {
+                        String existingIdentifier = c.getGroupId() != null ? c.getGroupId() : c.getCourseCode();
+                        return existingIdentifier.equals(courseIdentifier);
+                    });
+
+            if(isDuplicate) continue;
+
+
             currentCombination.add(courseToAdd);
             if (!hasTimeConflictInList(currentCombination)) {
                 findCombinationsForTypeRecursive(pool, range, i + 1, currentCombination, currentCredits + courseToAdd.getCredits(), result);
@@ -264,12 +302,9 @@ public class TimetableService {
         String currentType = targetTypes.get(typeIndex);
         List<List<DetailedCourseInfo>> partialCombinations = combinationsByType.get(currentType);
 
-        // 해당 유형의 조합이 없거나 필수적이지 않다면(min=0), 바로 다음 유형으로 넘어감
-        CreditRangeDto range = creditSettings.getCreditGoalsPerType().get(currentType);
+        // 해당 유형의 조합이 없으면(필수적이지 않거나 이미 충족), 바로 다음 유형으로 넘어감
         if (partialCombinations == null || partialCombinations.isEmpty()) {
-            if (range != null && range.getMin() == 0) {
-                combineTypeCombinationsRecursive(targetTypes, typeIndex + 1, currentTimetable, combinationsByType, finalResult, creditSettings, numRecommendationsNeeded, currentUser);
-            }
+            combineTypeCombinationsRecursive(targetTypes, typeIndex + 1, currentTimetable, combinationsByType, finalResult, creditSettings, numRecommendationsNeeded, currentUser);
             return;
         }
 
@@ -283,6 +318,7 @@ public class TimetableService {
             }
         }
     }
+
 
     // ================== 유틸리티 및 헬퍼 메서드 ==================
 
