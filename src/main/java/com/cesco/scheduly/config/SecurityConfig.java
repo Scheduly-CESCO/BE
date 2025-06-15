@@ -75,7 +75,8 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://54.180.159.200",
-                "https://scheduly.site"
+                "https://scheduly.site",
+                "https://fe-eta-five.vercel.app/"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
