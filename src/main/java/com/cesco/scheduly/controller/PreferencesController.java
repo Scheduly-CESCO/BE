@@ -82,6 +82,12 @@ public class PreferencesController {
     return ResponseEntity.ok(Map.of("status", "retake_removed"));
   }
 
+  @GetMapping("/retake/available")   // 재수강 과목에서 기수강 과목 조회
+  public ResponseEntity<List<DetailedCourseInfo>> getRetakeCandidates(@RequestParam Long userId) {
+    List<DetailedCourseInfo> taken = userService.getTakenCoursesWithDetails(userId);
+    return ResponseEntity.ok(taken);
+  }
+
   @GetMapping("/courses")
   public ResponseEntity<Map<String, List<DetailedCourseInfo>>> getUserCoursesByFilter(
           @RequestParam Long userId,
@@ -100,7 +106,16 @@ public class PreferencesController {
             "mandatory", toDetails.apply(selection.getMandatoryCourses()),
             "retake", toDetails.apply(selection.getRetakeCourses())
     );
-
     return ResponseEntity.ok(result);
+  }
+
+  @GetMapping("/retake")
+  public ResponseEntity<List<DetailedCourseInfo>> getRetakeCourses(@RequestParam Long userId) {
+    List<String> retakeCodes = userService.getRetakeCourses(userId);
+    List<DetailedCourseInfo> details = retakeCodes.stream()
+            .map(courseCode -> courseDataService.getDetailedCourseByCode(courseCode))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    return ResponseEntity.ok(details);
   }
 }

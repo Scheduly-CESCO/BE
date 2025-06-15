@@ -17,6 +17,7 @@ import com.cesco.scheduly.enums.FusionMajorModule;
 import com.cesco.scheduly.exception.AuthenticationException;
 import com.cesco.scheduly.exception.ResourceNotFoundException;
 import com.cesco.scheduly.exception.UserAlreadyExistsException;
+import com.cesco.scheduly.model.DetailedCourseInfo;
 import com.cesco.scheduly.repository.UserCourseSelectionRepository;
 import com.cesco.scheduly.repository.UserPreferenceRepository;
 import com.cesco.scheduly.repository.UserRepository;
@@ -41,6 +42,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final UserCourseSelectionRepository userCourseSelectionRepository;
     private final UserPreferenceRepository userPreferenceRepository;
+    private final CourseDataService courseDataService;
+
     private final ObjectMapper objectMapper; // JSON 변환을 위해 ObjectMapper 주입
 
     private final PasswordEncoder passwordEncoder;
@@ -50,12 +53,14 @@ public class UserService {
                        UserCourseSelectionRepository userCourseSelectionRepository,
                        UserPreferenceRepository userPreferenceRepository,
                        PasswordEncoder passwordEncoder,
+                       CourseDataService courseDataService,
                        ObjectMapper objectMapper) {
         this.userRepository = userRepository;
         this.userCourseSelectionRepository = userCourseSelectionRepository;
         this.userPreferenceRepository = userPreferenceRepository;
         this.passwordEncoder = passwordEncoder;
         this.objectMapper = objectMapper;
+        this.courseDataService = courseDataService;
     }
 
     @Transactional
@@ -476,5 +481,13 @@ public class UserService {
     public UserCourseSelectionEntity getUserCourseSelectionByUserId(Long userId) {
         return userCourseSelectionRepository.findByUser_Id(userId)
                 .orElseThrow(() -> new NoSuchElementException("선택 과목 정보가 존재하지 않습니다. userId = " + userId));
+    }
+
+    public List<DetailedCourseInfo> getTakenCoursesWithDetails(Long userId) {
+        List<String> codes = getTakenCourses(userId);
+        return codes.stream()
+                .map(courseDataService::getDetailedCourseByCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 }
