@@ -83,9 +83,14 @@ public class PreferencesController {
   }
 
   @GetMapping("/courses")
-  public ResponseEntity<Map<String, List<DetailedCourseInfo>>> getAllUserCourses(@RequestParam Long userId) {
-    UserCourseSelectionEntity selection = userService.getUserCourseSelectionByUserId(userId); // 아래 설명 참고
+  public ResponseEntity<Map<String, List<DetailedCourseInfo>>> getUserCoursesByFilter(
+          @RequestParam Long userId,
+          @RequestParam(required = false) String courseCode // 필터링 파라미터 추가
+  ) {
+    UserCourseSelectionEntity selection = userService.getUserCourseSelectionByUserId(userId);
+
     Function<List<String>, List<DetailedCourseInfo>> toDetails = courseCodes -> courseCodes.stream()
+            .filter(code -> courseCode == null || code.equals(courseCode)) // 필터링 조건
             .map(courseDataService::getDetailedCourseByCode)
             .filter(Objects::nonNull)
             .collect(Collectors.toList());
