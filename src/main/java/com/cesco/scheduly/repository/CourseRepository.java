@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CourseRepository extends JpaRepository<CourseEntity, String> { // 엔티티와 PK 타입을 명시
@@ -33,4 +34,7 @@ public interface CourseRepository extends JpaRepository<CourseEntity, String> { 
     // LectureFilterController에서 사용하던 기능을 대체
     @Query("SELECT c.courseCode FROM CourseEntity c WHERE c.courseCode LIKE CONCAT(:prefix, '%')")
     List<String> findCourseCodesStartingWith(@Param("prefix") String prefix);
+
+    Optional<CourseEntity> findByCourseCode(String courseCode);
+
 }

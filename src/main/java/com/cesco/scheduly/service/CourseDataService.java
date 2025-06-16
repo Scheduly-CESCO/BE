@@ -43,6 +43,22 @@ public class CourseDataService {
                 .orElse(null);
     }
 
+    /**
+     * 학수번호로 단일 강의의 상세 정보를 조회합니다.
+     * @param courseCode 조회할 강의의 학수번호
+     * @return 조회된 강의 정보 DTO (없으면 null 반환)
+     */
+    public CourseInfo getCourseByCode(String courseCode) {
+        return courseRepository.findByCourseCode(courseCode) // 1. Repository 메소드 호출
+                .map(entity -> new CourseInfo( // 2. 결과가 있으면 CourseInfo DTO로 변환
+                        entity.getCourseCode(),
+                        entity.getCourseName(),
+                        entity.getDepartmentOriginal(),
+                        entity.getCredits(),
+                        entity.getGrade()))
+                .orElse(null); // 3. 결과가 없으면 null 반환
+    }
+
     // CourseController가 사용하는 메소드
     public List<CourseInfo> searchCourses(String query, String department, String grade) {
         return courseRepository.searchCourses(query, department, grade).stream()
