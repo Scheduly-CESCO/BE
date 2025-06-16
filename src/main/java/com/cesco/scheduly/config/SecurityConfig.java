@@ -50,7 +50,7 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers("/auth/signup", "/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/courses/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/courses/search", "/courses/past-search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/courses/user-selections").authenticated()
                         .requestMatchers("/preferences/**").authenticated()
                         .requestMatchers("/lectures/**").authenticated()
