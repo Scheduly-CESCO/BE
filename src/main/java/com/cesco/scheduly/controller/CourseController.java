@@ -27,30 +27,16 @@ public class CourseController {
     }
 
 
+// src/main/java/com/cesco/scheduly/controller/CourseController.java
+
     @GetMapping("/search")
     public ResponseEntity<CourseSearchResponse> searchCourses(
-            @RequestParam(required = false) String q,
-            @RequestParam(required = false) String department,
-            @RequestParam(required = false) String grade) {
-        List<CourseInfo> courses = courseDataService.searchCourses(q, department, grade);
+            @RequestParam("CourseCode") String coursecode) { // 파라미터 이름을 'q'로 명시하고, 필수 값으로 변경합니다.
+        // department와 grade 파라미터에 null을 전달하여 해당 필터링 조건을 무시하도록 합니다.
+        List<CourseInfo> courses = courseDataService.searchCourses(coursecode, null, null);
         return ResponseEntity.ok(new CourseSearchResponse(courses));
     }
 
-    /**
-     * 학수번호로 특정 강의 하나를 조회합니다.
-     * @param courseCode URL 경로에 포함된 학수번호
-     * @return 200 OK 와 함께 강의 정보, 없으면 404 Not Found
-     */
-    @GetMapping("/{courseCode}")
-    public ResponseEntity<CourseInfo> getCourseByCourseCode(@PathVariable String courseCode) {
-        CourseInfo courseInfo = courseDataService.getCourseByCode(courseCode);
-
-        if (courseInfo != null) {
-            return ResponseEntity.ok(courseInfo); // 강의 정보가 있으면 200 OK
-        } else {
-            return ResponseEntity.notFound().build(); // 강의 정보가 없으면 404 Not Found
-        }
-    }
 
     @GetMapping("/user-selections")
     public ResponseEntity<List<DetailedCourseInfo>> getUserSelectionCourses(@RequestParam Long userId) {
