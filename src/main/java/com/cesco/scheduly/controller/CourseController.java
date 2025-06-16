@@ -2,12 +2,18 @@ package com.cesco.scheduly.controller;
 
 import com.cesco.scheduly.dto.course.CourseInfo;
 import com.cesco.scheduly.dto.course.CourseSearchResponse;
+import com.cesco.scheduly.dto.course.PastCourseDto;
+import com.cesco.scheduly.dto.course.PastCourseSearchResponse;
 import com.cesco.scheduly.model.DetailedCourseInfo;
 import com.cesco.scheduly.service.CourseDataService;
+import com.cesco.scheduly.service.PastCourseService;
 import com.cesco.scheduly.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Objects;
@@ -19,15 +25,16 @@ public class CourseController {
 
     private final CourseDataService courseDataService;
     private final UserService userService; // UserService 추가
+    private final PastCourseService pastCourseService; // PastCourseService 추가
 
     @Autowired
-    public CourseController(CourseDataService courseDataService, UserService userService) {
+    public CourseController(CourseDataService courseDataService, UserService userService,
+                            PastCourseService pastCourseService) {
         this.courseDataService = courseDataService;
         this.userService = userService;
+        this.pastCourseService = pastCourseService;
+
     }
-
-
-// src/main/java/com/cesco/scheduly/controller/CourseController.java
 
     @GetMapping("/search")
     public ResponseEntity<CourseSearchResponse> searchCourses(
@@ -37,6 +44,11 @@ public class CourseController {
         return ResponseEntity.ok(new CourseSearchResponse(courses));
     }
 
+    @GetMapping("/past-search")
+    public ResponseEntity<PastCourseSearchResponse> searchPastCourses(@RequestParam("q") String query) {
+        List<PastCourseDto> results = pastCourseService.search(query);
+        return ResponseEntity.ok(new PastCourseSearchResponse(results));
+    }
 
     @GetMapping("/user-selections")
     public ResponseEntity<List<DetailedCourseInfo>> getUserSelectionCourses(@RequestParam Long userId) {
