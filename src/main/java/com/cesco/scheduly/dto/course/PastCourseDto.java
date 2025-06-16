@@ -6,15 +6,15 @@ import lombok.Data;
 @Data
 public class PastCourseDto {
 
-    @JsonProperty("학수번호")
+    @JsonProperty("courseCode")
     private String courseCode;
 
-    @JsonProperty("개설영역")
+    @JsonProperty("department")
     private String department;
 
-    @JsonProperty("교과목명")
+    @JsonProperty("courseName")
     private String courseName;
 
-    @JsonProperty("담당교수")
+    @JsonProperty("professor")
     private String professor;
 }
