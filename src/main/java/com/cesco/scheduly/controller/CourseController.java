@@ -31,9 +31,9 @@ public class CourseController {
 
     @GetMapping("/search")
     public ResponseEntity<CourseSearchResponse> searchCourses(
-            @RequestParam("CourseCode") String coursecode) { // 파라미터 이름을 'q'로 명시하고, 필수 값으로 변경합니다.
+            @RequestParam("q") String query) { // 파라미터 이름을 'q'로 명시하고, 필수 값으로 변경합니다.
         // department와 grade 파라미터에 null을 전달하여 해당 필터링 조건을 무시하도록 합니다.
-        List<CourseInfo> courses = courseDataService.searchCourses(coursecode, null, null);
+        List<CourseInfo> courses = courseDataService.searchCourses(query, null, null);
         return ResponseEntity.ok(new CourseSearchResponse(courses));
     }
 

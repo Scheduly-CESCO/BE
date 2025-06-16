@@ -45,8 +45,8 @@ public class CourseDataService {
 
 
     // CourseController가 사용하는 메소드
-    public List<CourseInfo> searchCourses(String coursecode, String department, String grade) {
-        return courseRepository.searchCourses(coursecode, department, grade).stream()
+    public List<CourseInfo> searchCourses(String query, String department, String grade) {
+        return courseRepository.searchCourses(query, department, grade).stream()
                 .map(entity -> new CourseInfo(entity.getCourseCode(), entity.getCourseName(), entity.getDepartmentOriginal(), entity.getCredits(), entity.getGrade()))
                 .collect(Collectors.toList());
     }
